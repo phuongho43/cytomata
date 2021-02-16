@@ -65,7 +65,7 @@ def segment_clusters(img, factor=1, rs=None):
     samp = img[thr_img]
     samp = samp[samp < np.percentile(samp, 95)]
     thr = log > (0.1*np.std(samp) * factor)
-    thr = median(thr, disk(3))
+    thr = median(thr, disk(1))
     if rs is not None:
         thr = remove_small_objects(ndi.label(thr)[0].astype(bool), min_size=rs)
     if not np.any(thr):

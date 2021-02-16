@@ -46,7 +46,8 @@ def process_fluo_timelapse(img_dir, save_dir, u_csv=None,
             if adj_bright:
                 a_reg = img[img > 0]
                 if os.path.isfile(segmt_mask) and os.path.exists(segmt_mask):
-                    a_reg = seg_bound*a_reg
+                    a_reg = seg_bound*img
+                    a_reg = a_reg[a_reg > 0]
                 if i == 0:
                     kval = np.mean(a_reg)
                 segmt_factor = (np.mean(a_reg)/kval) + factor - 1
@@ -79,7 +80,7 @@ def process_fluo_timelapse(img_dir, save_dir, u_csv=None,
 
 def process_fluo_images(img_dir, save_dir,
     sb_microns=22, cmax=None, segmt=False, segmt_dots=False,
-    segmt_mask_dir=None, segmt_factor=1, remove_small=None,
+    segmt_mask_dir='', segmt_factor=1, remove_small=None,
     fill_holes=None, clear_border=None, iter_cb=iter_cb):
     """Analyze fluorescence 10x images and generate figures."""
     if cmax is None:
@@ -89,12 +90,14 @@ def process_fluo_images(img_dir, save_dir,
     imgs = []
     for i, imgf in enumerate(tqdm(list_img_files(img_dir))):
         fname = os.path.splitext(os.path.basename(imgf))[0]
-        segmt_mask = os.path.join(segmt_mask_dir, fname)
         img, raw, bkg, den = preprocess_img(imgf)
         plot_bkg_profile(fname, save_dir, raw, bkg)
         thr = None
         yi = np.mean(img)
         if segmt:
+            segmt_mask = ''
+            if segmt_mask_dir is not None:
+                segmt_mask = os.path.join(segmt_mask_dir, fname)
             if os.path.isfile(segmt_mask) and os.path.exists(segmt_mask):
                 seg_bound = img_as_float(imread(segmt_mask)) > 0
             if segmt_dots:
@@ -118,20 +121,20 @@ def process_fluo_images(img_dir, save_dir,
 
 
 if __name__ == '__main__':
-    i = 2
-    root_dir = '/home/phuong/data/CAD/CAD/'
-    save_dir = os.path.join(root_dir, 'results', str(i))
-    img_dir = os.path.join(root_dir, 'mCherry', str(i))
-    u_csv = os.path.join(root_dir, 'u{}.csv'.format(i))
-    segmt = os.path.join(root_dir, 'mask.tif')
-    process_fluo_timelapse(img_dir, save_dir, u_csv=u_csv,
-        t_unit='s', ulabel='BL', sb_microns=16, cmax=None,
-        segmt=True, segmt_dots=True, segmt_mask=segmt, segmt_factor=1, remove_small=15,
-        fill_holes=None, clear_border=None, adj_bright=False)
+    # i = 0
+    # root_dir = '/home/phuong/data/FPs/p53Tetra/20210109_CIB-mTq2-p53TetraV1_CRY2-mCh/'
+    # save_dir = os.path.join(root_dir, 'results', str(i))
+    # img_dir = os.path.join(root_dir, 'mCherry', str(i))
+    # u_csv = os.path.join(root_dir, 'u{}.csv'.format(i))
+    # segmt = os.path.join(root_dir, 'mask.tif')
+    # process_fluo_timelapse(img_dir, save_dir, u_csv=u_csv,
+    #     t_unit='s', ulabel='BL', sb_microns=22, cmax=None,
+    #     segmt=False, segmt_dots=False, segmt_mask=segmt, segmt_factor=2,
+    #     remove_small=2000, fill_holes=None, clear_border=None, adj_bright=False)
     
-    # root_dir = '/home/phuong/data/ILID/GEx/20210204/20210203_LexA-NLS-WT_NLS-sspBn-VPR_6LexO-mScI_t0/'
-    # img_dir = os.path.join(root_dir, 'Default')
-    # save_dir = os.path.join(root_dir, 'results')
-    # process_fluo_images(img_dir, save_dir,
-    #     sb_microns=220, cmax=None, segmt=True, segmt_dots=False,
-    #     segmt_factor=0.25, remove_small=25, fill_holes=None, clear_border=None)
+    root_dir = '/home/phuong/data/FPs/p53Tetra/20210129_CIBN-mTq2-p53TetraV1/'
+    img_dir = os.path.join(root_dir, 'Default')
+    save_dir = os.path.join(root_dir, 'results')
+    process_fluo_images(img_dir, save_dir,
+        sb_microns=22, cmax=None, segmt=False, segmt_dots=False, segmt_mask_dir='',
+        segmt_factor=1, remove_small=15, fill_holes=None, clear_border=None)
