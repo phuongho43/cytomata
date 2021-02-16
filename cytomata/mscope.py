@@ -61,14 +61,15 @@ class Microscope(object):
 
     def set_position(self, axis, value):
         if axis.lower() == 'xy' and self.xy_device:
-            if (value[0] > self.xlim[0] and value[0] < self.xlim[1] and
-            value[1] > self.ylim[0] and value[1] < self.ylim[1]):
-                self.core.setXYPosition(self.xy_device, value[0], value[1])
-                print('MOVE TO XY:', value)
+            x0 = self.get_position('x')
+            y0 = self.get_position('y')
+            if abs(value[0] - x0) > 1 and abs(value[1] - y0) > 1:
+                if (value[0] > self.xlim[0] and value[0] < self.xlim[1] and
+                value[1] > self.ylim[0] and value[1] < self.ylim[1]):
+                    self.core.setXYPosition(self.xy_device, value[0], value[1])
         elif axis.lower() == 'z' and self.z_device:
             if value > self.zlim[0] and value < self.zlim[1]:
                 self.core.setPosition(self.z_device, value)
-                print('MOVE TO Z:', value)
         else:
             raise ValueError('Invalid axis arg in Microscope.set_position(axis).')
 
@@ -105,8 +106,10 @@ class Microscope(object):
         clear_screen()
 
     def snap_image(self):
+        self.core.clearCircularBuffer()
         self.core.snapImage()
         img = self.core.getImage()
+        self.core.clearCircularBuffer()
         return img
 
     def snap_zstack(self, chs, zdepth, step):
@@ -169,15 +172,15 @@ class Microscope(object):
             if self.settings['mpos_mode'] == 'parallel':
                 for i in range(len(self.coords)):
                     (x, y, z) = self.coords[i]
-                    self.set_position('xy', (x, y))
+                    # self.set_position('xy', (x, y))
                     self.take_images(i, chs)
             elif self.settings['mpos_mode'] == 'sequential':
                 (x, y, z) = self.coords[self.cid]
-                self.set_position('xy', (x, y))
+                # self.set_position('xy', (x, y))
                 self.take_images(self.cid, chs)
         else:
             (x, y, z) = self.coords[self.cid]
-            self.set_position('xy', (x, y))
+            # self.set_position('xy', (x, y))
             self.take_images(self.cid, chs)
 
     def queue_imaging(self, t_info, chs):
@@ -211,15 +214,15 @@ class Microscope(object):
             if self.settings['mpos_mode'] == 'parallel':
                 for i in range(len(self.coords)):
                     (x, y, z) = self.coords[i]
-                    self.set_position('xy', (x, y))
+                    # self.set_position('xy', (x, y))
                     self.pulse_light(i, width, ch_ind)
             elif self.settings['mpos_mode'] == 'sequential':
                 (x, y, z) = self.coords[self.cid]
-                self.set_position('xy', (x, y))
+                # self.set_position('xy', (x, y))
                 self.pulse_light(self.cid, width, ch_ind)
         else:
             (x, y, z) = self.coords[self.cid]
-            self.set_position('xy', (x, y))
+            # self.set_position('xy', (x, y))
             self.pulse_light(self.cid, width, ch_ind)
 
     def queue_induction(self, t_info, ch_ind):
@@ -249,6 +252,7 @@ class Microscope(object):
                 best_foc = foc
                 best_pos = zz
         self.coords[cid, 2] = best_pos + offset
+        self.set_position('z', best_pos)
         print(best_foc, best_pos)
 
     def autofocus_task(self, ch, bounds, z_step, offset):
@@ -256,15 +260,15 @@ class Microscope(object):
             if self.settings['mpos_mode'] == 'parallel':
                 for i in range(len(self.coords)):
                     (x, y, z) = self.coords[i]
-                    self.set_position('xy', (x, y))
+                    # self.set_position('xy', (x, y))
                     self.autofocus(i, ch, bounds, z_step, offset)
             elif self.settings['mpos_mode'] == 'sequential':
                 (x, y, z) = self.coords[self.cid]
-                self.set_position('xy', (x, y))
+                # self.set_position('xy', (x, y))
                 self.autofocus(self.cid, ch, bounds, z_step, offset)
         else:
             (x, y, z) = self.coords[self.cid]
-            self.set_position('xy', (x, y))
+            # self.set_position('xy', (x, y))
             self.autofocus(self.cid, ch, bounds, z_step, offset)
 
     def queue_autofocus(self, t_info, ch, bounds, z_step, offset):

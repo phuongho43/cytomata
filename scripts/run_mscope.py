@@ -10,7 +10,7 @@ from configs.mm_settings import CONFIG_DIR, MM_CFG_FILE, SETTINGS, INDUCTION, IM
 
 
 expt_name = raw_input('Expt Directory Name: ')
-expt_name = ''.join([x if x.isalnum() or x is '-' else '_' for x in expt_name])
+expt_name = ''.join([x if x.isalnum() or x in '-.' else '_' for x in expt_name])
 SETTINGS['save_dir'] = os.path.join('expts', time.strftime('%Y%m%d_') + expt_name)
 setup_dirs(SETTINGS['save_dir'])
 settings_file = os.path.join(CONFIG_DIR, 'mm_settings.py')
