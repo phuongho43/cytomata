@@ -6,10 +6,8 @@ from collections import defaultdict, deque
 import numpy as np
 import cv2
 from skimage.io import imsave
-from skimage.filters import laplace
-from scipy.optimize import minimize_scalar
 
-import MMCorePy
+from pycromanager import Bridge
 from cytomata.utils import setup_dirs, clear_screen
 
 
@@ -18,8 +16,9 @@ class Microscope(object):
     Microscope task automation and data recording.
     """
     def __init__(self, settings, config_file):
-        self.core = MMCorePy.CMMCore()
-        self.core.loadSystemConfiguration(config_file)
+        self.bridge = Bridge()
+        self.core = self.bridge.get_core()
+        self.core.load_system_configuration(config_file)
         self.tasks = []
         self.settings = settings
         self.save_dir = settings['save_dir']
@@ -28,8 +27,7 @@ class Microscope(object):
         self.xy_device = self.settings['xy_device']
         self.z_device = self.settings['z_device']
         for dev in self.settings['img_sync']:
-            self.core.assignImageSynchro(dev)
-        self.core.setProperty(self.settings['cam_device'], 'CircularBufferEnabled', 'OFF')
+            self.core.assign_image_synchro(dev)
         self.uta = defaultdict(list)
         self.utb = defaultdict(list)
         self.x0 = self.get_position('x')
@@ -43,51 +41,56 @@ class Microscope(object):
         self.t0 = time.time()
 
     def set_channel(self, chname):
-        if chname != self.core.getCurrentConfig(self.ch_group):
-            self.core.setConfig(self.ch_group, chname)
+        if chname != self.core.get_current_config(self.ch_group):
+            self.core.set_config(self.ch_group, chname)
 
     def set_magnification(self, mag):
-        if mag != self.core.getState(self.obj_device):
-            self.core.setState(self.obj_device, mag)
+        if mag != self.core.get_state(self.obj_device):
+            self.core.set_state(self.obj_device, mag)
 
     def get_position(self, axis):
-        if axis.lower() == 'x' and self.xy_device:
-            return self.core.getXPosition(self.xy_device)
-        elif axis.lower() == 'y' and self.xy_device:
-            return self.core.getYPosition(self.xy_device)
+        if axis.lower() == 'xy' and self.xy_device:
+            return self.core.get_x_y_position(self.xy_device)
         elif axis.lower() == 'z' and self.z_device:
-            return self.core.getPosition(self.z_device)
+            return self.core.get_position(self.z_device)
         else:
             raise ValueError('Invalid axis arg in Microscope.get_position(axis).')
 
     def set_position(self, axis, value):
         if axis.lower() == 'xy' and self.xy_device:
-            x0 = self.get_position('x')
-            y0 = self.get_position('y')
+            x0, y0 = self.get_position('xy')
             if abs(value[0] - x0) > 1 and abs(value[1] - y0) > 1:
                 if (value[0] > self.xlim[0] and value[0] < self.xlim[1] and
                 value[1] > self.ylim[0] and value[1] < self.ylim[1]):
-                    self.core.setXYPosition(self.xy_device, value[0], value[1])
+                    self.core.set_x_y_position(self.xy_device, value[0], value[1])
         elif axis.lower() == 'z' and self.z_device:
             if value > self.zlim[0] and value < self.zlim[1]:
-                self.core.setPosition(self.z_device, value)
+                self.core.set_position(self.z_device, value)
         else:
             raise ValueError('Invalid axis arg in Microscope.set_position(axis).')
 
+    def convert_tagged_img(self, tagged_img):
+        img_h = tagged_img.tags['Height']
+        img_w = tagged_img.tags['Width']
+        return tagged_image.pix.reshape((img_h, img_w))
+
     def add_coord(self):
-        x = self.get_position('x')
-        y = self.get_position('y')
+        x, y = self.get_position('xy')
         z = self.get_position('z')
         self.coords = np.vstack(([x, y, z], self.coords))
 
     def add_coords_session(self, ch):
         self.set_channel(ch)
+        n_bits = self.core.get_image_bit_depth()
         cv2.namedWindow('Coordinate Picker')
-        self.core.startContinuousSequenceAcquisition(1)
+        self.core.start_continuous_sequence_acquisition(1)
         while True:
-            if self.core.getRemainingImageCount() > 0:
-                img = self.core.getLastImage()
-                img = cv2.normalize(img, dst=None, alpha=0, beta=65535, norm_type=cv2.NORM_MINMAX)
+            if self.core.get_remaining_image_count() > 0:
+                timg = self.core.get_last_tagged_image()
+                img = convert_tagged_img(timg)
+                self.core.clear_circular_buffer()
+                img = cv2.normalize(img, dst=None,
+                    alpha=0, beta=2**n_bits - 1, norm_type=cv2.NORM_MINMAX)
                 cv2.imshow('Coordinate Picker', img)
             k = cv2.waitKey(20)
             if k == 27:  # ESC - Exit
@@ -103,13 +106,15 @@ class Microscope(object):
                 for coord in self.coords:
                     print(coord)
         cv2.destroyAllWindows()
-        self.core.stopSequenceAcquisition()
+        self.core.stop_sequence_acquisition()
         clear_screen()
 
     def snap_image(self):
-        self.core.waitForSystem()
-        self.core.snapImage()
-        img = self.core.getImage()
+        self.core.wait_for_system()
+        self.core.snap_image()
+        timg = self.core.get_tagged_image()
+        img = self.convert_tagged_img(timg)
+        self.core.clear_circular_buffer()
         return img
 
     def snap_zstack(self, chs, zdepth, step):
@@ -195,14 +200,29 @@ class Microscope(object):
             for i in range(len(self.coords)):
                 setup_dirs(os.path.join(self.save_dir, ch, str(i)))
 
+    # def pulse_light(self, cid, width, ch_ind):
+    #     self.set_channel(ch_ind)
+    #     exp0 = self.core.get_exposure()
+    #     self.core.setExposure(width*1000)
+    #     ta = time.time() - self.t0
+    #     self.snap_image()
+    #     tb = time.time() - self.t0
+    #     self.core.setExposure(exp0)
+    #     self.uta[cid].append(ta)
+    #     self.utb[cid].append(tb)
+    #     u_path = os.path.join(self.save_dir, 'u' + str(cid) + '.csv')
+    #     u_data = np.column_stack((self.uta[cid], self.utb[cid]))
+    #     np.savetxt(u_path, u_data, delimiter=',', header='ta,tb', comments='')
+
     def pulse_light(self, cid, width, ch_ind):
         self.set_channel(ch_ind)
-        exp0 = self.core.getExposure()
-        self.core.setExposure(width*1000)
+        self.core.set_auto_shutter(False)
         ta = time.time() - self.t0
-        self.snap_image()
+        self.core.set_shutter_open(True)
+        time.sleep(width)
+        self.core.set_shutter_open(False)
         tb = time.time() - self.t0
-        self.core.setExposure(exp0)
+        self.core.set_auto_shutter(True)
         self.uta[cid].append(ta)
         self.utb[cid].append(tb)
         u_path = os.path.join(self.save_dir, 'u' + str(cid) + '.csv')

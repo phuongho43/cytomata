@@ -4,12 +4,12 @@ import time
 import shutil
 sys.path.append(os.path.abspath('../'))
 
-from cytomata.utils import setup_dirs, clear_screen
+from cytomata.utils import setup_dirs
 from cytomata.mscope import Microscope
 from configs.mm_settings import CONFIG_DIR, MM_CFG_FILE, SETTINGS, INDUCTION, IMAGING, AUTOFOCUS
 
 
-expt_name = raw_input('Expt Directory Name: ')
+expt_name = input('Expt Directory Name: ')
 expt_name = ''.join([x if x.isalnum() or x in '-.' else '_' for x in expt_name])
 SETTINGS['save_dir'] = os.path.join('expts', time.strftime('%Y%m%d_') + expt_name)
 setup_dirs(SETTINGS['save_dir'])
