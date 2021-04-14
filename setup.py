@@ -32,7 +32,7 @@ setuptools.setup(
         "Operating System :: MacOS",
         "Operating System :: Microsoft :: Windows",
         "Operating System :: Unix",
-        "Programming Language :: Python :: 3.6",
+        "Programming Language :: Python :: 3.8",
         "Topic :: Scientific/Engineering",
     ],
     keywords=cytomata.__keywords__,
@@ -44,7 +44,7 @@ setuptools.setup(
     license=cytomata.__license__,
     packages=setuptools.find_packages(exclude=['tests']),
     install_requires=[
-        'numpy', 'scipy', 'pandas', 'matplotlib', 'seaborn', 'scikit-image', 'opencv-python',
-        'natsort', 'tqdm', 'lmfit', 'scikits.odes'
+        'numpy', 'scipy', 'pandas', 'matplotlib', 'seaborn', 'scikit-image',
+        'opencv-python', 'natsort', 'tqdm', 'lmfit'
     ]
 )
