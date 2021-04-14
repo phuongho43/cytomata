@@ -16,7 +16,7 @@ setup_dirs(SETTINGS['save_dir'])
 settings_file = os.path.join(CONFIG_DIR, 'mm_settings.py')
 settings_file_save = os.path.join(SETTINGS['save_dir'], 'settings.txt')
 shutil.copyfile(settings_file, settings_file_save)
-cfg_file = os.path.join(CONFIG_DIR, 'mm_nikon2.cfg')
+cfg_file = os.path.join(CONFIG_DIR, 'mm_nikon2_nostage.cfg')
 cfg_file_save = os.path.join(SETTINGS['save_dir'], 'configs.txt')
 shutil.copyfile(cfg_file, cfg_file_save)
 

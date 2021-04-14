@@ -29,6 +29,7 @@ class Microscope(object):
         self.z_device = self.settings['z_device']
         for dev in self.settings['img_sync']:
             self.core.assignImageSynchro(dev)
+        self.core.setProperty(self.settings['cam_device'], 'CircularBufferEnabled', 'OFF')
         self.uta = defaultdict(list)
         self.utb = defaultdict(list)
         self.x0 = self.get_position('x')
@@ -106,10 +107,9 @@ class Microscope(object):
         clear_screen()
 
     def snap_image(self):
-        self.core.clearCircularBuffer()
+        self.core.waitForSystem()
         self.core.snapImage()
         img = self.core.getImage()
-        self.core.clearCircularBuffer()
         return img
 
     def snap_zstack(self, chs, zdepth, step):
@@ -253,7 +253,6 @@ class Microscope(object):
                 best_pos = zz
         self.coords[cid, 2] = best_pos + offset
         self.set_position('z', best_pos)
-        print(best_foc, best_pos)
 
     def autofocus_task(self, ch, bounds, z_step, offset):
         if self.settings['mpos']:

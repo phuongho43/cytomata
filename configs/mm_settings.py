@@ -2,14 +2,15 @@ import os
 
 
 CONFIG_DIR = os.path.dirname(os.path.abspath(__file__))
-MM_CFG_FILE = os.path.join(CONFIG_DIR, 'mm_nikon2.cfg')
+MM_CFG_FILE = os.path.join(CONFIG_DIR, 'mm_nikon2_nostage.cfg')
 
 
 SETTINGS = {
-    'img_sync': ['XYStage', 'TIZDrive', 'Wheel-A', 'Wheel-B', 'Wheel-C', 'TIFilterBlock1'],
+    'img_sync': ['TIZDrive', 'Wheel-A', 'Wheel-B', 'Wheel-C', 'TIFilterBlock1'],
+    'cam_device': 'Prime95B',
     'ch_group': 'Channel',
     'obj_device': 'TINosePiece',
-    'xy_device': 'XYStage',
+    'xy_device': '',
     'z_device': 'TIZDrive',
     'img_width_px': 1200,
     'img_width_um': 132,
@@ -27,13 +28,13 @@ SETTINGS = {
 
 ## Seconds-Timescale ##
 # IMAGING = {
-#     't_info': [(0, 56, 5), (60, 62, 1), (65, 301, 5)],  # (start, stop, period)
+#     't_info': [(0, 56, 5), (60, 62, 1), (65, 181, 5)],  # (start, stop, period)
 #     'chs': ['mCherry']
 # }
 
 # INDUCTION = {
 #     't_info': [(60, 61, 1, 1)],  # (start, stop, period, width)
-#     'ch_ind': 'BL'
+#     'ch_ind': 'BL10x'
 # }
 
 
@@ -49,33 +50,33 @@ SETTINGS = {
 # }
 
 
-## Minutes-Timescale ##
-IMAGING = {
-    't_info': [(0, 301, 5)],
-    'chs': ['mCherry']
-}
-
-INDUCTION = {
-    't_info': [(60, 300, 15, 0.1)],
-    'ch_ind': 'BL10x'
-}
-
-
-# Hours-Timescale ## 
+# Minutes-Timescale ##
 # IMAGING = {
-#     't_info': [(0, 57601, 300)],
-#     'chs': ['mCherry', 'DIC']
+#     't_info': [(0, 301, 5)],
+#     'chs': ['mCherry']
 # }
 
 # INDUCTION = {
-#     't_info': [(0, 57601, 30, 1)],
-#     'ch_ind': 'BL10x'
+#     't_info': [(60, 300, 5, 1)],
+#     'ch_ind': 'BL100'
 # }
 
+
+# Hours-Timescale ## 
+IMAGING = {
+    't_info': [(0, 300, 30), (300, 39601, 300)],
+    'chs': ['YFP', 'DIC']
+}
+
+INDUCTION = {
+    't_info': [(0, 39600, 30, 10)],
+    'ch_ind': 'BL10'
+}
+
 AUTOFOCUS = {
-    # 't_info': [(0, 57601, 300)],
-    # 'ch': 'DIC',
-    # 'bounds': [-2.0, 2.0],
-    # 'z_step': 0.5,
-    # 'offset': 0
+    't_info': [(0, 39600, 300)],
+    'ch': 'DIC',
+    'bounds': [-1.0, 1.0],
+    'z_step': 0.5,
+    'offset': 0
 }
