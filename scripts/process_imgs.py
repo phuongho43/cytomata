@@ -6,8 +6,12 @@ sys.path.append(os.path.abspath('../'))
 import numpy as np
 from tqdm import tqdm
 from imageio import mimwrite
-from skimage import img_as_float
-from skimage.io import imread
+from skimage import img_as_float, img_as_uint
+from skimage.io import imread, imsave
+
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 from cytomata.plot import plot_cell_img, plot_bkg_profile, plot_uy
 from cytomata.process import preprocess_img, segment_object, segment_clusters, process_u_csv
@@ -22,7 +26,8 @@ def process_fluo_timelapse(img_dir, save_dir, u_csv=None,
     remove_small=None, fill_holes=None, clear_border=None, adj_bright=False, iter_cb=iter_cb):
     """Analyze fluorescence timelapse images and generate figures."""
     if cmax is None:
-        cmax = np.max([np.percentile(img_as_float(imread(imgf)), 99.9) for imgf in list_img_files(img_dir)])
+        cmax = 1*np.max([np.percentile(img_as_float(imread(imgf)), 99.9) for imgf in list_img_files(img_dir)])
+        cmax = 1 if cmax > 1 else cmax
     n_imgs = len(list_img_files(img_dir))
     t = [np.float(os.path.splitext(os.path.basename(imgf))[0]) for imgf in list_img_files(img_dir)]
     y = []
@@ -58,9 +63,9 @@ def process_fluo_timelapse(img_dir, save_dir, u_csv=None,
                     rs=remove_small, fh=fill_holes, cb=clear_border)
             if os.path.isfile(segmt_mask) and os.path.exists(segmt_mask):
                 thr *= seg_bound
-            yi = np.mean(img[thr])
+            yi = np.sum(img[thr])
             if np.isnan(yi):
-                yi = np.mean(img)
+                yi = 0
         y.append(yi)
         sig_ann = round(float(fname), 1) in t_ann_img
         cell_img = plot_cell_img(den, thr, fname, save_dir,
@@ -84,7 +89,8 @@ def process_fluo_images(img_dir, save_dir,
     fill_holes=None, clear_border=None, iter_cb=iter_cb):
     """Analyze fluorescence 10x images and generate figures."""
     if cmax is None:
-        cmax = np.max([np.percentile(img_as_float(imread(imgf)), 99.9) for imgf in list_img_files(img_dir)])
+        cmax = 1*np.max([np.percentile(img_as_float(imread(imgf)), 99.9) for imgf in list_img_files(img_dir)])
+        cmax = 1 if cmax > 1 else cmax
     n_imgs = len(list_img_files(img_dir))
     y = []
     imgs = []
@@ -109,7 +115,7 @@ def process_fluo_images(img_dir, save_dir,
                 thr *= seg_bound
             yi = np.mean(img[thr])
             if np.isnan(yi):
-                yi = np.mean(img)
+                yi = 0
         y.append(yi)
         cell_img = plot_cell_img(den, thr, fname, save_dir,
             cmax, sig_ann=False, t_unit=None, sb_microns=sb_microns)
@@ -120,21 +126,60 @@ def process_fluo_images(img_dir, save_dir,
         np.array(y), delimiter=',', header='y', comments='')
 
 
+def compare_before_after(root_dir):
+    y_data = pd.read_csv(os.path.join(root_dir, 'y.csv'))
+    y = y_data['Response']
+    palette = ['#BBDEFB', '#2196F3']
+    with plt.style.context(('seaborn-whitegrid', custom_styles)), sns.color_palette(palette):
+        g = sns.catplot(x="Group", y="Response", hue="Timepoint", data=y_data,
+            height=8, aspect=2, kind='strip', legend=False, dodge=True, s=10)
+        # g = sns.swarmplot(x="Group", y="Response", hue="Timepoint",
+        #            data=y_data, height=8, aspect=1.5, dodge=True, legend=False)
+        g.ax.set_xticklabels(["TetR-iLID-slow", "LexA-iLID-WT"])
+        g.ax.set_xlabel('')
+        g.ax.set_ylabel('Ave Fl. Intensity')
+        g.ax.set_yscale('log')
+        handles, labels = g.ax.get_legend_handles_labels()
+        g.ax.legend(handles, ['t=0hr', 't=24hr'], loc='best', prop={"size": 20})
+        plt.savefig(os.path.join(root_dir, 'y.png'), dpi=200, transparent=False, bbox_inches='tight')
+        plt.close()
+
+def barplot_expts(root_dir):
+    y_data = pd.read_csv(os.path.join(root_dir, 'y.csv'))
+    with plt.style.context(('seaborn-whitegrid', custom_styles)), sns.color_palette(custom_palette):
+        fig, ax = plt.subplots(figsize=(20,8))
+        ax = sns.boxplot(x="System", y="Response", data=y_data, whis=np.inf)
+        g = sns.stripplot(x="System", y="Response", data=y_data, ax=ax, size=10, color=".3")
+        # ax.set_yscale("log")
+        # g.ax.set_xticks([-0.2, 1.2])
+        # plt.legend(loc='upper center', prop={"size": 20})
+        ax.set_xticklabels(["6TetO-mScI", "TetR-NES-VPR", "TetR-VPR-LINUS", "6TetO-mScI\nTetR-NES-VPR", "6TetO-mScI\nTetR-VPR-LINUS"])
+        ax.set_ylabel('Ave Fluorescence Intensity')
+        ax.set_xlabel('')
+        plt.savefig(os.path.join(root_dir, 'y.png'), dpi=200, transparent=False, bbox_inches='tight')
+        plt.close()
+
+
 if __name__ == '__main__':
-    # i = 0
-    # root_dir = '/home/phuong/data/FPs/p53Tetra/20210109_CIB-mTq2-p53TetraV1_CRY2-mCh/'
-    # save_dir = os.path.join(root_dir, 'results', str(i))
-    # img_dir = os.path.join(root_dir, 'mCherry', str(i))
-    # u_csv = os.path.join(root_dir, 'u{}.csv'.format(i))
-    # segmt = os.path.join(root_dir, 'mask.tif')
-    # process_fluo_timelapse(img_dir, save_dir, u_csv=u_csv,
-    #     t_unit='s', ulabel='BL', sb_microns=22, cmax=None,
-    #     segmt=False, segmt_dots=False, segmt_mask=segmt, segmt_factor=2,
-    #     remove_small=2000, fill_holes=None, clear_border=None, adj_bright=False)
+    i = 0
+    root_dir = '/home/phuong/data/ILID/GEx/20210409_6TetO-mScI_NLS-sspBn-VPR_TetR-NLS-16I_BL10-1s-300s/'
+    img_ch = 'mCherry'
+    save_dir = os.path.join(root_dir, 'results', str(i), img_ch)
+    img_dir = os.path.join(root_dir, img_ch, str(i))
+    u_csv = os.path.join(root_dir, 'u{}.csv'.format(i))
+    segmt = os.path.join(root_dir, 'mask.tif')
+    process_fluo_timelapse(img_dir, save_dir, u_csv='',
+        t_unit='s', ulabel='BL', sb_microns=220, cmax=None,
+        segmt=False, segmt_dots=False, segmt_mask='', segmt_factor=2.0,
+        remove_small=2000, fill_holes=None, clear_border=None, adj_bright=True)
     
-    root_dir = '/home/phuong/data/FPs/p53Tetra/20210129_CIBN-mTq2-p53TetraV1/'
-    img_dir = os.path.join(root_dir, 'Default')
-    save_dir = os.path.join(root_dir, 'results')
-    process_fluo_images(img_dir, save_dir,
-        sb_microns=22, cmax=None, segmt=False, segmt_dots=False, segmt_mask_dir='',
-        segmt_factor=1, remove_small=15, fill_holes=None, clear_border=None)
+    # root_dir = '/home/phuong/data/ERT2/20210412/20210412_6LexO-mGold_LexA74-ERT2-VPR_4OHT-t24/'
+    # img_dir = os.path.join(root_dir, 'Default')
+    # save_dir = os.path.join(root_dir, 'results')
+    # process_fluo_images(img_dir, save_dir,
+    #     sb_microns=220, cmax=None, segmt=False, segmt_dots=False, segmt_mask_dir='',
+    #     segmt_factor=0.5, remove_small=15, fill_holes=None, clear_border=None)
+
+    # root_dir = '/home/phuong/data/LINUS/LINUS/GEx/20210301/'
+    # # compare_before_after(root_dir)
+    # barplot_expts(root_dir)

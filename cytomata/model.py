@@ -1,5 +1,6 @@
 from scikits.odes import ode
 from scikits.odes.odeint import odeint
+from scipy.integrate import solve_ivp
 
 
 def sim_itranslo(t, y0, uf, params):
@@ -182,3 +183,25 @@ def sim_fresca(t, y0, uf, params):
     solver = ode('cvode', model, old_api=False, **options)
     solution = solver.solve(t, y0)
     return solution.values.t, solution.values.y
+
+
+
+def sim_idimer(t, y0, uf, params):
+    def model(t, y):
+        u = uf(t)
+        [A, B, AB] = y
+        kf = params['kf']
+        kr = params['kr']
+        dA = kr*AB - u*kf*A*B
+        dB = kr*AB - u*kf*A*B
+        dAB = u*kf*A*B - kr*AB
+        return [dA, dB, dAB]
+    results = solve_ivp(
+        fun=model,
+        t_span=[t[0], t[-1]], y0=y0, t_eval=t,
+        method='LSODA', rtol=1e-3, atol=1e-6, max_step=1)
+    t = results.t
+    A = results.y[0]
+    B = results.y[1]
+    AB = results.y[2]
+    return t, A, B, AB

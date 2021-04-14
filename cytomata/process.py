@@ -6,7 +6,6 @@ from scipy import ndimage as ndi
 from skimage import img_as_float
 from skimage.io import imread
 from skimage.measure import label
-from skimage.filters import median
 from skimage.filters import (gaussian, laplace, median,
     threshold_li, threshold_yen, threshold_otsu)
 from skimage.morphology import (remove_small_objects, remove_small_holes,
@@ -21,19 +20,20 @@ def preprocess_img(imgf):
     """Subtract background and denoise fluorescence image."""
     img = img_as_float(imread(imgf))
     raw = img.copy()
-    bkg = img.copy()
     sig = estimate_sigma(img)
-    rfrac = np.percentile(raw, 25)/np.percentile(raw, 75)
+    den = denoise_nl_means(img, h=sig, sigma=sig, patch_size=3, patch_distance=5)
+    bkg = den.copy()
+    rfrac = np.percentile(bkg, 25)/np.percentile(bkg, 75)
     tval = threshold_li(bkg) * 1.25
     broi = bkg*(bkg < tval)
     rfrac = np.max([rfrac, 0.35])
     tval = np.percentile(broi, rfrac*100)
     bkg[bkg >= tval] = tval
-    bkg = gaussian(bkg, 50)
+    bkg = gaussian(bkg, 50) + sig
+    bkg[bkg < 0] = 0
     img = img - bkg
     img[img < 0] = 0
-    den = denoise_nl_means(img, h=sig, sigma=sig, patch_size=3, patch_distance=5)
-    den = den - 2*sig
+    den = den - bkg
     den[den < 0] = 0
     return img, raw, bkg, den
 
