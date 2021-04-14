@@ -15,7 +15,7 @@ import seaborn as sns
 
 from cytomata.plot import plot_cell_img, plot_bkg_profile, plot_uy
 from cytomata.process import preprocess_img, segment_object, segment_clusters, process_u_csv
-from cytomata.utils import setup_dirs, list_img_files, rescale, custom_styles, custom_palette
+from cytomata.utils import list_img_files, custom_styles, custom_palette
 
 def iter_cb(img, prog):
     return False
@@ -29,7 +29,7 @@ def process_fluo_timelapse(img_dir, save_dir, u_csv=None,
         cmax = 1*np.max([np.percentile(img_as_float(imread(imgf)), 99.9) for imgf in list_img_files(img_dir)])
         cmax = 1 if cmax > 1 else cmax
     n_imgs = len(list_img_files(img_dir))
-    t = [np.float(os.path.splitext(os.path.basename(imgf))[0]) for imgf in list_img_files(img_dir)]
+    t = [float(os.path.splitext(os.path.basename(imgf))[0]) for imgf in list_img_files(img_dir)]
     y = []
     tu = []
     u = []
@@ -162,22 +162,22 @@ def barplot_expts(root_dir):
 
 if __name__ == '__main__':
     i = 0
-    root_dir = '/home/phuong/data/ILID/GEx/20210409_6TetO-mScI_NLS-sspBn-VPR_TetR-NLS-16I_BL10-1s-300s/'
+    root_dir = '/home/phuong/data/LINUS/LANS/20210409_4KE4-LANS4_BL100-1s-5s_1/'
     img_ch = 'mCherry'
     save_dir = os.path.join(root_dir, 'results', str(i), img_ch)
     img_dir = os.path.join(root_dir, img_ch, str(i))
     u_csv = os.path.join(root_dir, 'u{}.csv'.format(i))
     segmt = os.path.join(root_dir, 'mask.tif')
     process_fluo_timelapse(img_dir, save_dir, u_csv='',
-        t_unit='s', ulabel='BL', sb_microns=220, cmax=None,
+        t_unit='s', ulabel='BL', sb_microns=22, cmax=None,
         segmt=False, segmt_dots=False, segmt_mask='', segmt_factor=2.0,
         remove_small=2000, fill_holes=None, clear_border=None, adj_bright=True)
     
-    # root_dir = '/home/phuong/data/ERT2/20210412/20210412_6LexO-mGold_LexA74-ERT2-VPR_4OHT-t24/'
+    # root_dir = '/home/phuong/data/FPs/ccTet/20210413_ccTet-NLS-mScI_imgs/'
     # img_dir = os.path.join(root_dir, 'Default')
     # save_dir = os.path.join(root_dir, 'results')
     # process_fluo_images(img_dir, save_dir,
-    #     sb_microns=220, cmax=None, segmt=False, segmt_dots=False, segmt_mask_dir='',
+    #     sb_microns=22, cmax=None, segmt=False, segmt_dots=False, segmt_mask_dir='',
     #     segmt_factor=0.5, remove_small=15, fill_holes=None, clear_border=None)
 
     # root_dir = '/home/phuong/data/LINUS/LINUS/GEx/20210301/'

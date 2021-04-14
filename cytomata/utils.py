@@ -8,7 +8,6 @@ import matplotlib.pyplot as plt
 from natsort import natsorted
 from scipy.interpolate import interp1d
 from skimage import img_as_ubyte
-from cytomata import turbo_cmap
 
 
 custom_palette = [
