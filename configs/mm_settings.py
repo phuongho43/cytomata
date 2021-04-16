@@ -2,7 +2,7 @@ import os
 
 
 CONFIG_DIR = os.path.dirname(os.path.abspath(__file__))
-MM_CFG_FILE = os.path.join(CONFIG_DIR, 'mm_nikon2_nostage.cfg')
+MM_CFG_FILE = os.path.join(CONFIG_DIR, 'mm_nikon2.cfg')
 
 
 SETTINGS = {
@@ -10,7 +10,7 @@ SETTINGS = {
     'cam_device': 'Prime95B',
     'ch_group': 'Channel',
     'obj_device': 'TINosePiece',
-    'xy_device': '',
+    'xy_device': 'XYStage',
     'z_device': 'TIZDrive',
     'img_width_px': 1200,
     'img_height_px': 1200,
@@ -34,7 +34,7 @@ SETTINGS = {
 
 # INDUCTION = {
 #     't_info': [(60, 61, 1, 1)],  # (start, stop, period, width)
-#     'ch_ind': 'BL10x'
+#     'ch_ind': 'BL100'
 # }
 
 
@@ -45,8 +45,8 @@ SETTINGS = {
 # }
 
 # INDUCTION = {
-#     't_info': [(60, 181, 20, 1), (183, 241, 3, 1)],  # (start, stop, period, width)
-#     'ch_ind': 'BL'
+#     't_info': [(60, 181, 5, 1)],  # (start, stop, period, width)
+#     'ch_ind': 'BL10'
 # }
 
 
@@ -58,25 +58,25 @@ SETTINGS = {
 
 # INDUCTION = {
 #     't_info': [(60, 300, 5, 1)],
-#     'ch_ind': 'BL100'
+#     'ch_ind': 'BL10'
 # }
 
 
 # Hours-Timescale ## 
 IMAGING = {
-    't_info': [(0, 300, 30), (300, 39601, 300)],
+    't_info': [(0, 300, 30), (300, 43201, 300)],
     'chs': ['YFP', 'DIC']
 }
 
 INDUCTION = {
-    't_info': [(0, 39600, 30, 10)],
+    't_info': [(0, 43200, 30, 10)],
     'ch_ind': 'BL10'
 }
 
 AUTOFOCUS = {
-    't_info': [(0, 39600, 300)],
+    't_info': [(0, 43200, 300)],
     'ch': 'DIC',
-    'bounds': [-1.0, 1.0],
-    'z_step': 0.5,
+    'bounds': [-3.0, 3.0],
+    'z_step': 1,
     'offset': 0
 }

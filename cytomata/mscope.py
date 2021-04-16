@@ -30,13 +30,13 @@ class Microscope(object):
             self.core.assign_image_synchro(dev)
         self.uta = defaultdict(list)
         self.utb = defaultdict(list)
-        self.x0 = self.get_position('x')
-        self.y0 = self.get_position('y')
+        self.x0, self.y0 = self.get_position('xy')
         self.z0 = self.get_position('z')
         self.xlim = np.array(settings['stage_x_limit']) + self.x0
         self.ylim = np.array(settings['stage_y_limit']) + self.y0
         self.zlim = np.array(settings['stage_z_limit']) + self.z0
         self.coords = np.array([[self.x0, self.y0, self.z0]])
+        print(self.coords)
         self.cid = 0
         self.t0 = time.time()
 
@@ -50,7 +50,9 @@ class Microscope(object):
 
     def get_position(self, axis):
         if axis.lower() == 'xy' and self.xy_device:
-            return self.core.get_x_y_position(self.xy_device)
+            x = self.core.get_x_position(self.xy_device)
+            y = self.core.get_y_position(self.xy_device)
+            return x, y
         elif axis.lower() == 'z' and self.z_device:
             return self.core.get_position(self.z_device)
         else:
@@ -72,7 +74,7 @@ class Microscope(object):
     def convert_tagged_img(self, tagged_img):
         img_h = tagged_img.tags['Height']
         img_w = tagged_img.tags['Width']
-        return tagged_image.pix.reshape((img_h, img_w))
+        return tagged_img.pix.reshape((img_h, img_w))
 
     def add_coord(self):
         x, y = self.get_position('xy')
@@ -110,6 +112,7 @@ class Microscope(object):
         clear_screen()
 
     def snap_image(self):
+        print(self.coords)
         self.core.wait_for_system()
         self.core.snap_image()
         timg = self.core.get_tagged_image()
@@ -177,15 +180,11 @@ class Microscope(object):
             if self.settings['mpos_mode'] == 'parallel':
                 for i in range(len(self.coords)):
                     (x, y, z) = self.coords[i]
-                    # self.set_position('xy', (x, y))
+                    self.set_position('xy', (x, y))
                     self.take_images(i, chs)
-            elif self.settings['mpos_mode'] == 'sequential':
-                (x, y, z) = self.coords[self.cid]
-                # self.set_position('xy', (x, y))
-                self.take_images(self.cid, chs)
         else:
             (x, y, z) = self.coords[self.cid]
-            # self.set_position('xy', (x, y))
+            self.set_position('xy', (x, y))
             self.take_images(self.cid, chs)
 
     def queue_imaging(self, t_info, chs):
@@ -200,20 +199,6 @@ class Microscope(object):
             for i in range(len(self.coords)):
                 setup_dirs(os.path.join(self.save_dir, ch, str(i)))
 
-    # def pulse_light(self, cid, width, ch_ind):
-    #     self.set_channel(ch_ind)
-    #     exp0 = self.core.get_exposure()
-    #     self.core.setExposure(width*1000)
-    #     ta = time.time() - self.t0
-    #     self.snap_image()
-    #     tb = time.time() - self.t0
-    #     self.core.setExposure(exp0)
-    #     self.uta[cid].append(ta)
-    #     self.utb[cid].append(tb)
-    #     u_path = os.path.join(self.save_dir, 'u' + str(cid) + '.csv')
-    #     u_data = np.column_stack((self.uta[cid], self.utb[cid]))
-    #     np.savetxt(u_path, u_data, delimiter=',', header='ta,tb', comments='')
-
     def pulse_light(self, cid, width, ch_ind):
         self.set_channel(ch_ind)
         self.core.set_auto_shutter(False)
@@ -222,7 +207,6 @@ class Microscope(object):
         time.sleep(width)
         self.core.set_shutter_open(False)
         tb = time.time() - self.t0
-        self.core.set_auto_shutter(True)
         self.uta[cid].append(ta)
         self.utb[cid].append(tb)
         u_path = os.path.join(self.save_dir, 'u' + str(cid) + '.csv')
@@ -236,10 +220,6 @@ class Microscope(object):
                     (x, y, z) = self.coords[i]
                     # self.set_position('xy', (x, y))
                     self.pulse_light(i, width, ch_ind)
-            elif self.settings['mpos_mode'] == 'sequential':
-                (x, y, z) = self.coords[self.cid]
-                # self.set_position('xy', (x, y))
-                self.pulse_light(self.cid, width, ch_ind)
         else:
             (x, y, z) = self.coords[self.cid]
             # self.set_position('xy', (x, y))
@@ -281,10 +261,6 @@ class Microscope(object):
                     (x, y, z) = self.coords[i]
                     # self.set_position('xy', (x, y))
                     self.autofocus(i, ch, bounds, z_step, offset)
-            elif self.settings['mpos_mode'] == 'sequential':
-                (x, y, z) = self.coords[self.cid]
-                # self.set_position('xy', (x, y))
-                self.autofocus(self.cid, ch, bounds, z_step, offset)
         else:
             (x, y, z) = self.coords[self.cid]
             # self.set_position('xy', (x, y))
