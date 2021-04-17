@@ -6,17 +6,12 @@ MM_CFG_FILE = os.path.join(CONFIG_DIR, 'mm_nikon2.cfg')
 
 
 SETTINGS = {
-    'img_sync': ['TIZDrive', 'Wheel-A', 'Wheel-B', 'Wheel-C', 'TIFilterBlock1'],
+    'img_sync': ['XYStage', 'TIZDrive', 'Wheel-A', 'Wheel-B', 'Wheel-C', 'TIFilterBlock1'],
     'cam_device': 'Prime95B',
     'ch_group': 'Channel',
     'obj_device': 'TINosePiece',
     'xy_device': 'XYStage',
     'z_device': 'TIZDrive',
-    'img_width_px': 1200,
-    'img_height_px': 1200,
-    'pixel_size': 0.11,
-    'img_width_um': 132,
-    'img_height_um': 132,
     'stage_z_limit': [-240, 240],
     'stage_x_limit': [-9600, 9600],
     'stage_y_limit': [-9600, 9600],

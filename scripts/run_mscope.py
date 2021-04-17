@@ -10,15 +10,14 @@ from configs.mm_settings import CONFIG_DIR, MM_CFG_FILE, SETTINGS, INDUCTION, IM
 
 
 expt_name = input('Expt Directory Name: ')
-expt_name = ''.join([x if x.isalnum() or x in '-.' else '_' for x in expt_name])
+expt_name = ''.join([x if x.isalnum() or x in '-_.' else '_' for x in expt_name])
 SETTINGS['save_dir'] = os.path.join('expts', time.strftime('%Y%m%d_') + expt_name)
 setup_dirs(SETTINGS['save_dir'])
 settings_file = os.path.join(CONFIG_DIR, 'mm_settings.py')
 settings_file_save = os.path.join(SETTINGS['save_dir'], 'settings.txt')
 shutil.copyfile(settings_file, settings_file_save)
-cfg_file = os.path.join(CONFIG_DIR, 'mm_nikon2.cfg')
 cfg_file_save = os.path.join(SETTINGS['save_dir'], 'configs.txt')
-shutil.copyfile(cfg_file, cfg_file_save)
+shutil.copyfile(MM_CFG_FILE, cfg_file_save)
 
 
 mscope = Microscope(SETTINGS, MM_CFG_FILE)

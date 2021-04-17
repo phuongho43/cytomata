@@ -218,11 +218,11 @@ class Microscope(object):
             if self.settings['mpos_mode'] == 'parallel':
                 for i in range(len(self.coords)):
                     (x, y, z) = self.coords[i]
-                    # self.set_position('xy', (x, y))
+                    self.set_position('xy', (x, y))
                     self.pulse_light(i, width, ch_ind)
         else:
             (x, y, z) = self.coords[self.cid]
-            # self.set_position('xy', (x, y))
+            self.set_position('xy', (x, y))
             self.pulse_light(self.cid, width, ch_ind)
 
     def queue_induction(self, t_info, ch_ind):
@@ -259,11 +259,11 @@ class Microscope(object):
             if self.settings['mpos_mode'] == 'parallel':
                 for i in range(len(self.coords)):
                     (x, y, z) = self.coords[i]
-                    # self.set_position('xy', (x, y))
+                    self.set_position('xy', (x, y))
                     self.autofocus(i, ch, bounds, z_step, offset)
         else:
             (x, y, z) = self.coords[self.cid]
-            # self.set_position('xy', (x, y))
+            self.set_position('xy', (x, y))
             self.autofocus(self.cid, ch, bounds, z_step, offset)
 
     def queue_autofocus(self, t_info, ch, bounds, z_step, offset):
