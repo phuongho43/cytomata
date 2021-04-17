@@ -29,7 +29,7 @@ def preprocess_img(imgf):
     rfrac = np.max([rfrac, 0.35])
     tval = np.percentile(broi, rfrac*100)
     bkg[bkg >= tval] = tval
-    bkg = gaussian(bkg, 50) + sig
+    bkg = gaussian(bkg, 64) + sig
     bkg[bkg < 0] = 0
     img = img - bkg
     img[img < 0] = 0

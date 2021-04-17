@@ -26,8 +26,7 @@ def process_fluo_timelapse(img_dir, save_dir, u_csv=None,
     remove_small=None, fill_holes=None, clear_border=None, adj_bright=False, iter_cb=iter_cb):
     """Analyze fluorescence timelapse images and generate figures."""
     if cmax is None:
-        cmax = 1*np.max([np.percentile(img_as_float(imread(imgf)), 99.9) for imgf in list_img_files(img_dir)])
-        cmax = 1 if cmax > 1 else cmax
+        cmax = np.max([np.percentile(img_as_float(imread(imgf)), 99.9) for imgf in list_img_files(img_dir)])
     n_imgs = len(list_img_files(img_dir))
     t = [float(os.path.splitext(os.path.basename(imgf))[0]) for imgf in list_img_files(img_dir)]
     y = []
@@ -63,7 +62,7 @@ def process_fluo_timelapse(img_dir, save_dir, u_csv=None,
                     rs=remove_small, fh=fill_holes, cb=clear_border)
             if os.path.isfile(segmt_mask) and os.path.exists(segmt_mask):
                 thr *= seg_bound
-            yi = np.sum(img[thr])
+            yi = np.mean(img[thr])
             if np.isnan(yi):
                 yi = 0
         y.append(yi)
@@ -162,16 +161,16 @@ def barplot_expts(root_dir):
 
 if __name__ == '__main__':
     i = 0
-    root_dir = '/home/phuong/data/LINUS/LANS/20210409_4KE4-LANS4_BL100-1s-5s_1/'
+    root_dir = '/home/phuong/data/LINUS/LINUS/Loc/WT/20210223_LINUS_BL10x_0.1s-5s/'
     img_ch = 'mCherry'
-    save_dir = os.path.join(root_dir, 'results', str(i), img_ch)
+    save_dir = os.path.join(root_dir, 'results', str(i))
     img_dir = os.path.join(root_dir, img_ch, str(i))
     u_csv = os.path.join(root_dir, 'u{}.csv'.format(i))
     segmt = os.path.join(root_dir, 'mask.tif')
-    process_fluo_timelapse(img_dir, save_dir, u_csv='',
+    process_fluo_timelapse(img_dir, save_dir, u_csv=u_csv,
         t_unit='s', ulabel='BL', sb_microns=22, cmax=None,
         segmt=False, segmt_dots=False, segmt_mask='', segmt_factor=2.0,
-        remove_small=2000, fill_holes=None, clear_border=None, adj_bright=True)
+        remove_small=6000, fill_holes=None, clear_border=True, adj_bright=True)
     
     # root_dir = '/home/phuong/data/FPs/ccTet/20210413_ccTet-NLS-mScI_imgs/'
     # img_dir = os.path.join(root_dir, 'Default')
