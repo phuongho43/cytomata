@@ -90,7 +90,6 @@ class Microscope(object):
             if self.core.get_remaining_image_count() > 0:
                 timg = self.core.get_last_tagged_image()
                 img = convert_tagged_img(timg)
-                self.core.clear_circular_buffer()
                 img = cv2.normalize(img, dst=None,
                     alpha=0, beta=2**n_bits - 1, norm_type=cv2.NORM_MINMAX)
                 cv2.imshow('Coordinate Picker', img)
@@ -117,7 +116,6 @@ class Microscope(object):
         self.core.snap_image()
         timg = self.core.get_tagged_image()
         img = self.convert_tagged_img(timg)
-        self.core.clear_circular_buffer()
         return img
 
     def snap_zstack(self, chs, zdepth, step):

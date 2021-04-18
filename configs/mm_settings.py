@@ -59,12 +59,12 @@ SETTINGS = {
 
 # Hours-Timescale ## 
 IMAGING = {
-    't_info': [(0, 300, 30), (300, 43201, 300)],
-    'chs': ['YFP', 'DIC']
+    't_info': [(0, 43201, 300)],
+    'chs': ['YFP', 'mCherry']
 }
 
 INDUCTION = {
-    't_info': [(0, 43200, 30, 10)],
+    't_info': [(0, 43200, 10, 1)],
     'ch_ind': 'BL10'
 }
 
