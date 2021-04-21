@@ -36,7 +36,7 @@ class Microscope(object):
         self.ylim = np.array(settings['stage_y_limit']) + self.y0
         self.zlim = np.array(settings['stage_z_limit']) + self.z0
         self.coords = np.array([[self.x0, self.y0, self.z0]])
-        print(self.coords)
+        self.img_centroid = []
         self.cid = 0
         self.t0 = time.time()
 
@@ -234,21 +234,21 @@ class Microscope(object):
 
     def measure_focus(self):
         img = self.snap_image()
-        return np.var(img)
+        brenner = ((img[:, 0:-2] - img[:, 2:])**2).sum()
+        return brenner
 
-    def autofocus(self, cid, ch, bounds=[-3.0, 3.0], z_step=1.0, offset=0):
+    def autofocus(self, cid, ch, bounds=[-3.0, 3.0], max_iter=6, offset=0):
         self.set_channel(ch)
         zi = self.get_position('z')
         zl = np.max([zi + bounds[0], self.z0 - 50.0])
         zu = np.min([zi + bounds[1], self.z0 + 50.0])
-        best_foc = 0
-        best_pos = None
-        for zz in np.arange(zl, zu, z_step):
-            self.set_position('z', zz)
+        def residual(z):
+            self.set_position('z', z)
             foc = self.measure_focus()
-            if foc > best_foc:
-                best_foc = foc
-                best_pos = zz
+            return -foc
+        result = minimize_scalar(residual, method='bounded',
+            bounds=(zl, zu), options={'maxiter': max_iter, 'xatol': 2.0})
+        best_pos, best_foc = result.x, -result.fun
         self.coords[cid, 2] = best_pos + offset
         self.set_position('z', best_pos)
 

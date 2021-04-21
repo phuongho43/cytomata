@@ -161,22 +161,22 @@ def barplot_expts(root_dir):
 
 if __name__ == '__main__':
     i = 0
-    root_dir = '/home/phuong/data/LINUS/LINUS/Loc/WT/20210223_LINUS_BL10x_0.1s-5s/'
-    img_ch = 'mCherry'
-    save_dir = os.path.join(root_dir, 'results', str(i))
+    root_dir = '/home/phuong/data/ILID/GEx/LexA-4KE4/20210417_FRESCA_BL10-1s-10s/'
+    img_ch = 'YFP'
+    save_dir = os.path.join(root_dir, img_ch + '-results', str(i))
     img_dir = os.path.join(root_dir, img_ch, str(i))
     u_csv = os.path.join(root_dir, 'u{}.csv'.format(i))
     segmt = os.path.join(root_dir, 'mask.tif')
-    process_fluo_timelapse(img_dir, save_dir, u_csv=u_csv,
-        t_unit='s', ulabel='BL', sb_microns=22, cmax=None,
+    process_fluo_timelapse(img_dir, save_dir, u_csv='',
+        t_unit='s', ulabel='BL', sb_microns=110, cmax=None,
         segmt=False, segmt_dots=False, segmt_mask='', segmt_factor=2.0,
         remove_small=6000, fill_holes=None, clear_border=True, adj_bright=True)
     
-    # root_dir = '/home/phuong/data/FPs/ccTet/20210413_ccTet-NLS-mScI_imgs/'
+    # root_dir = '/home/phuong/data/ERT2/20210417/20210417_pMN333_4OHT_t0/'
     # img_dir = os.path.join(root_dir, 'Default')
     # save_dir = os.path.join(root_dir, 'results')
     # process_fluo_images(img_dir, save_dir,
-    #     sb_microns=22, cmax=None, segmt=False, segmt_dots=False, segmt_mask_dir='',
+    #     sb_microns=160, cmax=None, segmt=False, segmt_dots=False, segmt_mask_dir='',
     #     segmt_factor=0.5, remove_small=15, fill_holes=None, clear_border=None)
 
     # root_dir = '/home/phuong/data/LINUS/LINUS/GEx/20210301/'
