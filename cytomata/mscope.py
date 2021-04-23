@@ -6,6 +6,7 @@ from collections import defaultdict, deque
 import numpy as np
 import cv2
 from skimage.io import imsave
+from skimage.filters import laplace
 
 from pycromanager import Bridge
 from cytomata.utils import setup_dirs, clear_screen
@@ -111,7 +112,6 @@ class Microscope(object):
         clear_screen()
 
     def snap_image(self):
-        print(self.coords)
         self.core.wait_for_system()
         self.core.snap_image()
         timg = self.core.get_tagged_image()
@@ -234,21 +234,21 @@ class Microscope(object):
 
     def measure_focus(self):
         img = self.snap_image()
-        brenner = ((img[:, 0:-2] - img[:, 2:])**2).sum()
-        return brenner
+        return np.var(laplace(img))
 
-    def autofocus(self, cid, ch, bounds=[-3.0, 3.0], max_iter=6, offset=0):
+    def autofocus(self, cid, ch, bounds=[-50.0, 50.0], z_step=10.0, offset=0):
         self.set_channel(ch)
         zi = self.get_position('z')
         zl = np.max([zi + bounds[0], self.z0 - 50.0])
         zu = np.min([zi + bounds[1], self.z0 + 50.0])
-        def residual(z):
-            self.set_position('z', z)
+        best_foc = 0
+        best_pos = None
+        for zz in np.arange(zl, zu, z_step):
+            self.set_position('z', zz)
             foc = self.measure_focus()
-            return -foc
-        result = minimize_scalar(residual, method='bounded',
-            bounds=(zl, zu), options={'maxiter': max_iter, 'xatol': 2.0})
-        best_pos, best_foc = result.x, -result.fun
+            if foc > best_foc:
+                best_foc = foc
+                best_pos = zz
         self.coords[cid, 2] = best_pos + offset
         self.set_position('z', best_pos)
 

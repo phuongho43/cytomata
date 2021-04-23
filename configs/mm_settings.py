@@ -60,7 +60,7 @@ SETTINGS = {
 # Hours-Timescale ## 
 IMAGING = {
     't_info': [(0, 43201, 300)],
-    'chs': ['YFP', 'mCherry']
+    'chs': ['YFP', 'mCherry', 'DIC']
 }
 
 INDUCTION = {
@@ -71,7 +71,7 @@ INDUCTION = {
 AUTOFOCUS = {
     't_info': [(0, 43200, 300)],
     'ch': 'DIC',
-    'bounds': [-3.0, 3.0],
-    'z_step': 1,
+    'bounds': [-20.0, 20.0],
+    'z_step': 10.0,
     'offset': 0
 }
