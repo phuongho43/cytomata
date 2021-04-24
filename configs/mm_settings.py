@@ -3,6 +3,9 @@ import os
 
 CONFIG_DIR = os.path.dirname(os.path.abspath(__file__))
 MM_CFG_FILE = os.path.join(CONFIG_DIR, 'mm_nikon2.cfg')
+IMAGING = {}
+INDUCTION = {}
+AUTOFOCUS = {}
 
 
 SETTINGS = {
@@ -58,7 +61,7 @@ SETTINGS = {
 
 # Hours-Timescale ## 
 IMAGING = {
-    't_info': [(0, 43201, 300)],
+    't_info': [(0, 43201, 30)],
     'chs': ['YFP', 'mCherry', 'DIC']
 }
 
@@ -68,7 +71,7 @@ INDUCTION = {
 }
 
 AUTOFOCUS = {
-    't_info': [(0, 43200, 300)],
+    't_info': [(0, 43200, 30)],
     'ch': 'DIC',
     'bounds': [-20.0, 20.0],
     'z_step': 5.0,
