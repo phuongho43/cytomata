@@ -25,17 +25,16 @@ exp0 = mscope.core.get_exposure()
 mscope.core.set_exposure(0)
 mscope.set_channel('BL1')
 mscope.core.set_auto_shutter(False)
+mscope.core.set_shutter_open(False)
 img = mscope.snap_image()
 mscope.core.set_exposure(exp0)
-mscope.core.set_auto_shutter(True)
-
 
 if SETTINGS['mpos']:
     mscope.add_coords_session(SETTINGS['mpos_ch'])
 
 
 # Event Loop
-if SETTINGS['mpos'] and SETTINGS['mpos_mode'] == 'sequential':
+if SETTINGS['mpos'] == 'sequential':
     for cid in range(len(mscope.coords)):
         mscope.cid = cid
         mscope.t0 = time.time()

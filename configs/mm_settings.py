@@ -15,9 +15,8 @@ SETTINGS = {
     'stage_z_limit': [-240, 240],
     'stage_x_limit': [-9600, 9600],
     'stage_y_limit': [-9600, 9600],
-    'mpos': False,
+    'mpos': '', # '', 'sequential', 'parallel'
     'mpos_ch': 'mCherry',
-    'mpos_mode': 'sequential',  # "sequential" or "parallel"
 }
 
 
@@ -72,6 +71,6 @@ AUTOFOCUS = {
     't_info': [(0, 43200, 300)],
     'ch': 'DIC',
     'bounds': [-20.0, 20.0],
-    'z_step': 10.0,
+    'z_step': 5.0,
     'offset': 0
 }

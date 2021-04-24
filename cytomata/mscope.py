@@ -37,40 +37,37 @@ class Microscope(object):
         self.ylim = np.array(settings['stage_y_limit']) + self.y0
         self.zlim = np.array(settings['stage_z_limit']) + self.z0
         self.coords = np.array([[self.x0, self.y0, self.z0]])
-        self.img_centroid = []
         self.cid = 0
         self.t0 = time.time()
 
     def set_channel(self, chname):
-        if chname != self.core.get_current_config(self.ch_group):
-            self.core.set_config(self.ch_group, chname)
+        self.core.set_config(self.ch_group, chname)
 
     def set_magnification(self, mag):
-        if mag != self.core.get_state(self.obj_device):
-            self.core.set_state(self.obj_device, mag)
+        self.core.set_state(self.obj_device, mag)
 
     def get_position(self, axis):
-        if axis.lower() == 'xy' and self.xy_device:
+        if axis.lower() == 'xy':
             x = self.core.get_x_position(self.xy_device)
             y = self.core.get_y_position(self.xy_device)
             return x, y
-        elif axis.lower() == 'z' and self.z_device:
+        elif axis.lower() == 'z':
             return self.core.get_position(self.z_device)
         else:
-            raise ValueError('Invalid axis arg in Microscope.get_position(axis).')
+            raise ValueError('Invalid axis arg in mscope.get_position(axis).')
 
     def set_position(self, axis, value):
-        if axis.lower() == 'xy' and self.xy_device:
+        if axis.lower() == 'xy':
             x0, y0 = self.get_position('xy')
             if abs(value[0] - x0) > 1 and abs(value[1] - y0) > 1:
                 if (value[0] > self.xlim[0] and value[0] < self.xlim[1] and
                 value[1] > self.ylim[0] and value[1] < self.ylim[1]):
                     self.core.set_x_y_position(self.xy_device, value[0], value[1])
-        elif axis.lower() == 'z' and self.z_device:
+        elif axis.lower() == 'z':
             if value > self.zlim[0] and value < self.zlim[1]:
                 self.core.set_position(self.z_device, value)
         else:
-            raise ValueError('Invalid axis arg in Microscope.set_position(axis).')
+            raise ValueError('Invalid axis arg in mscope.set_position(axis).')
 
     def convert_tagged_img(self, tagged_img):
         img_h = tagged_img.tags['Height']
@@ -174,12 +171,11 @@ class Microscope(object):
                 imsave(img_path, img)
 
     def imaging_task(self, chs):
-        if self.settings['mpos']:
-            if self.settings['mpos_mode'] == 'parallel':
-                for i in range(len(self.coords)):
-                    (x, y, z) = self.coords[i]
-                    self.set_position('xy', (x, y))
-                    self.take_images(i, chs)
+        if self.settings['mpos'] == 'parallel':
+            for i in range(len(self.coords)):
+                (x, y, z) = self.coords[i]
+                self.set_position('xy', (x, y))
+                self.take_images(i, chs)
         else:
             (x, y, z) = self.coords[self.cid]
             self.set_position('xy', (x, y))
@@ -212,12 +208,11 @@ class Microscope(object):
         np.savetxt(u_path, u_data, delimiter=',', header='ta,tb', comments='')
 
     def induction_task(self, width, ch_ind):
-        if self.settings['mpos']:
-            if self.settings['mpos_mode'] == 'parallel':
-                for i in range(len(self.coords)):
-                    (x, y, z) = self.coords[i]
-                    self.set_position('xy', (x, y))
-                    self.pulse_light(i, width, ch_ind)
+        if self.settings['mpos'] == 'parallel':
+            for i in range(len(self.coords)):
+                (x, y, z) = self.coords[i]
+                self.set_position('xy', (x, y))
+                self.pulse_light(i, width, ch_ind)
         else:
             (x, y, z) = self.coords[self.cid]
             self.set_position('xy', (x, y))
@@ -253,12 +248,11 @@ class Microscope(object):
         self.set_position('z', best_pos)
 
     def autofocus_task(self, ch, bounds, z_step, offset):
-        if self.settings['mpos']:
-            if self.settings['mpos_mode'] == 'parallel':
-                for i in range(len(self.coords)):
-                    (x, y, z) = self.coords[i]
-                    self.set_position('xy', (x, y))
-                    self.autofocus(i, ch, bounds, z_step, offset)
+        if self.settings['mpos'] == 'parallel':
+            for i in range(len(self.coords)):
+                (x, y, z) = self.coords[i]
+                self.set_position('xy', (x, y))
+                self.autofocus(i, ch, bounds, z_step, offset)
         else:
             (x, y, z) = self.coords[self.cid]
             self.set_position('xy', (x, y))
