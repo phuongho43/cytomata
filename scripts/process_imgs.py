@@ -161,14 +161,14 @@ def barplot_expts(root_dir):
 
 if __name__ == '__main__':
     i = 0
-    root_dir = '/home/phuong/data/ILID/GEx/LexA-4KE4/20210417_FRESCA_BL10-1s-10s/'
-    img_ch = 'YFP'
+    root_dir = '/home/phuong/data/calcium/LINX-STIM1/20210415_myra/20210415_NLS-RA-CaM_NLS-B3-M13_LINX-STIM1/'
+    img_ch = 'mCherry'
     save_dir = os.path.join(root_dir, img_ch + '-results', str(i))
     img_dir = os.path.join(root_dir, img_ch, str(i))
     u_csv = os.path.join(root_dir, 'u{}.csv'.format(i))
     segmt = os.path.join(root_dir, 'mask.tif')
     process_fluo_timelapse(img_dir, save_dir, u_csv='',
-        t_unit='s', ulabel='BL', sb_microns=110, cmax=None,
+        t_unit='s', ulabel='BL', sb_microns=22, cmax=None,
         segmt=False, segmt_dots=False, segmt_mask='', segmt_factor=2.0,
         remove_small=6000, fill_holes=None, clear_border=True, adj_bright=True)
     
