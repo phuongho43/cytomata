@@ -58,11 +58,10 @@ class Microscope(object):
 
     def set_position(self, axis, value):
         if axis.lower() == 'xy':
-            x0, y0 = self.get_position('xy')
-            if abs(value[0] - x0) > 1 and abs(value[1] - y0) > 1:
-                if (value[0] > self.xlim[0] and value[0] < self.xlim[1] and
-                value[1] > self.ylim[0] and value[1] < self.ylim[1]):
-                    self.core.set_x_y_position(self.xy_device, value[0], value[1])
+            if (value[0] > self.xlim[0] and value[0] < self.xlim[1] and
+            value[1] > self.ylim[0] and value[1] < self.ylim[1]):
+                print('set_position', value)
+                self.core.set_xy_position(self.xy_device, round(value[0]), round(value[1]))
         elif axis.lower() == 'z':
             if value > self.zlim[0] and value < self.zlim[1]:
                 self.core.set_position(self.z_device, value)
@@ -178,7 +177,9 @@ class Microscope(object):
                 self.take_images(i, chs)
         else:
             (x, y, z) = self.coords[self.cid]
+            print('self_coords', x, y)
             self.set_position('xy', (x, y))
+            print('after set_pos', self.get_position('xy'))
             self.take_images(self.cid, chs)
 
     def queue_imaging(self, t_info, chs):
