@@ -12,6 +12,8 @@ from skimage.io import imread, imsave
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+from natsort import natsorted
+from scipy.interpolate import interp1d
 
 from cytomata.plot import plot_cell_img, plot_bkg_profile, plot_uy
 from cytomata.process import preprocess_img, segment_object, segment_clusters, process_u_csv
@@ -80,6 +82,69 @@ def process_fluo_timelapse(img_dir, save_dir, u_csv=None,
     with warnings.catch_warnings():
         warnings.simplefilter('ignore')
         mimwrite(os.path.join(save_dir, 'cell.gif'), imgs, fps=len(imgs)//10)
+
+
+def combine_uy(root_dir, fold_change=True, plot_u=True):
+    with plt.style.context(('seaborn-whitegrid', custom_styles)):
+        if plot_u:
+            fig, (ax0, ax) = plt.subplots(2, 1, sharex=True,
+                figsize=(16, 10), gridspec_kw={'height_ratios': [1, 8]})
+        else:
+            fig, ax = plt.subplots(figsize=(10,8)) 
+        combined_t = pd.DataFrame()
+        combined_y = pd.DataFrame()
+        combined_tu = pd.DataFrame()
+        combined_u = pd.DataFrame()
+        for i, data_dir in enumerate(natsorted([x[1] for x in os.walk(root_dir)][0])):
+            y_csv = os.path.join(root_dir, data_dir, 'y.csv')
+            y_data = pd.read_csv(y_csv)
+            t = y_data['t'].values
+            y = y_data['y'].values
+            yf = interp1d(t, y, fill_value='extrapolate')
+            t = np.arange(round(t[0]), round(t[-1]) + 1, 1)
+            t = pd.Series(t, index=t, name=i)
+            combined_t = pd.concat([combined_t, t], axis=1)
+            y = pd.Series([yf(ti) for ti in t], index=t, name=i)
+            if fold_change:
+                y = y/np.mean(y[:5])
+            combined_y = pd.concat([combined_y, y], axis=1)
+            ax.plot(y, color='#1976D2', alpha=1, linewidth=1)
+            u_csv = os.path.join(root_dir, data_dir, 'u.csv')
+            if plot_u:
+                u_data = pd.read_csv(u_csv)
+                tu = u_data['t'].values
+                tu = pd.Series(tu, index=tu, name=i)
+                u = pd.Series(u_data['u'].values, index=tu, name=i)
+                combined_tu = pd.concat([combined_tu, tu], axis=1)
+                combined_u = pd.concat([combined_u, u], axis=1)
+        t_ave = combined_t.mean(axis=1).rename('t_ave')
+        y_ave = combined_y.mean(axis=1).rename('y_ave')
+        y_std = combined_y.std(axis=1).rename('y_std')
+        y_sem = combined_y.sem(axis=1).rename('y_sem')
+        if plot_u:
+            tu_ave = combined_tu.mean(axis=1).rename('tu_ave')
+            u_ave = combined_u.mean(axis=1).rename('u_ave')
+            u_data = pd.concat([tu_ave, u_ave], axis=1).dropna()
+            u_data.to_csv(os.path.join(root_dir, 'u.csv'), index=False)
+        y_data = pd.concat([t_ave, y_ave, y_std, y_sem], axis=1).dropna()
+        y_data.to_csv(os.path.join(root_dir, 'y.csv'), index=False)
+        y_ave = y_data['y_ave']
+        y_ci = y_data['y_sem']*1.96
+        # ax.fill_between(t, (y_ave - y_ci), (y_ave + y_ci), color='#1976D2', alpha=.2, label='95% CI')
+        ax.plot(y_ave, color='#1976D2', label='Ave')
+        ax.set_xlabel('Time (s)')
+        ax.set_ylabel('AU')
+        if fold_change:
+            ax.set_ylabel('Fold Change')
+        ax.legend(loc='best')
+        if plot_u:
+            ax0.plot(tu, u, color='#1976D2')
+            ax0.set_yticks([0, 1])
+            ax0.set_ylabel('BL')
+        plot_name = 'y.png'
+        fig.savefig(os.path.join(root_dir, plot_name),
+            dpi=100, bbox_inches='tight', transparent=False)
+        plt.close(fig)
 
 
 def process_fluo_images(img_dir, save_dir,
@@ -161,16 +226,21 @@ def barplot_expts(root_dir):
 
 if __name__ == '__main__':
     i = 0
-    root_dir = '/home/phuong/data/calcium/LINX-STIM1/20210415_myra/20210415_NLS-RA-CaM_NLS-B3-M13_LINX-STIM1/'
+    root_dir = '/home/phuong/data/LINUS/LINX/20210428_mCh-LINX0_BL10-1s-5s/'
     img_ch = 'mCherry'
-    save_dir = os.path.join(root_dir, img_ch + '-results', str(i))
+    # save_dir = os.path.join(root_dir, img_ch + '-results', str(i))
+    save_dir = os.path.join(root_dir, 'results', str(i))
     img_dir = os.path.join(root_dir, img_ch, str(i))
+    # u_csv = os.path.join(root_dir, 'u{}.csv'.format(i))
     u_csv = os.path.join(root_dir, 'u{}.csv'.format(i))
-    segmt = os.path.join(root_dir, 'mask.tif')
+    mask = os.path.join(root_dir, 'mask.tif')
     process_fluo_timelapse(img_dir, save_dir, u_csv='',
-        t_unit='s', ulabel='BL', sb_microns=22, cmax=None,
-        segmt=False, segmt_dots=False, segmt_mask='', segmt_factor=2.0,
-        remove_small=6000, fill_holes=None, clear_border=True, adj_bright=True)
+        t_unit='s', ulabel='BL', sb_microns=11, cmax=None,
+        segmt=False, segmt_dots=False, segmt_mask=mask, segmt_factor=3.0,
+        remove_small=6000, fill_holes=None, clear_border=0, adj_bright=True)
+
+    # root_dir = '/home/phuong/data/ILID/ddFP/RA-27V/20200921-B3-sspBu_RA-27V_spike/results/'
+    # combine_uy(root_dir, fold_change=False, plot_u=True)
     
     # root_dir = '/home/phuong/data/ERT2/20210417/20210417_pMN333_4OHT_t0/'
     # img_dir = os.path.join(root_dir, 'Default')

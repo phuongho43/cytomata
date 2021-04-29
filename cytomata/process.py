@@ -2,6 +2,7 @@ import os
 
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 from scipy import ndimage as ndi
 from skimage import img_as_float
 from skimage.io import imread
@@ -26,10 +27,10 @@ def preprocess_img(imgf):
     rfrac = np.percentile(bkg, 25)/np.percentile(bkg, 75)
     tval = threshold_li(bkg) * 1.25
     broi = bkg*(bkg < tval)
-    rfrac = np.max([rfrac, 0.35])
+    rfrac = np.max([rfrac, 0.5])
     tval = np.percentile(broi, rfrac*100)
     bkg[bkg >= tval] = tval
-    bkg = gaussian(bkg, 64) + sig
+    bkg = gaussian(bkg, 64) + 2*sig
     bkg[bkg < 0] = 0
     img = img - bkg
     img[img < 0] = 0

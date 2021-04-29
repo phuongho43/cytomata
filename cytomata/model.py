@@ -12,7 +12,7 @@ def sim_idimer(t, y0, uf, params):
         dB = kr*AB - (u*ku + kf)*A*B
         dAB = (u*ku + kf)*A*B - kr*AB
         return [dA, dB, dAB]
-    results = solve_ivp(
+    result = solve_ivp(
         fun=model, t_span=[t[0], t[-1]], y0=y0, t_eval=t,
         method='LSODA', rtol=1e-3, atol=1e-6, max_step=1)
     return result.t, result.y
@@ -28,7 +28,7 @@ def sim_itrans(t, y0, uf, params):
         dC = kr*N - (u*ku + kf)*C
         dN = (u*ku + kf)*C - kr*N
         return [dC, dN]
-    results = solve_ivp(
+    result = solve_ivp(
         fun=model, t_span=[t[0], t[-1]], y0=y0, t_eval=t,
         method='LSODA', rtol=1e-3, atol=1e-6, max_step=1)
     return result.t, result.y
@@ -48,7 +48,7 @@ def sim_express(t, y0, xf, params):
         dR = ka + (kb*X**n)/(kc**n + X**n) - kd*R
         dP = kf*R - kg*P
         return [dR, dP]
-    results = solve_ivp(
+    result = solve_ivp(
         fun=model, t_span=[t[0], t[-1]], y0=y0, t_eval=t,
         method='LSODA', rtol=1e-3, atol=1e-6, max_step=1)
     return result.t, result.y
@@ -70,7 +70,7 @@ def sim_fresca(t, y0, uf, params):
         dA1B = (u*ku1 + kf1)*A1*B - kr1*A1B
         dA2B = (u*ku2 + kf2)*A2*B - kr2*A2B
         return [dA1, dA2, dB, dA1B, dA2B]
-    results = solve_ivp(
+    result = solve_ivp(
         fun=model, t_span=[t[0], t[-1]], y0=y0, t_eval=t,
         method='LSODA', rtol=1e-3, atol=1e-6, max_step=1)
     return result.t, result.y

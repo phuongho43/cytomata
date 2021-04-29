@@ -13,8 +13,87 @@ import matplotlib.pyplot as plt
 from scipy.interpolate import interp1d
 from natsort import natsorted
 
-from cytomata.model import sim_itranslo, sim_idimer, sim_iexpress, sim_ssl, sim_CaM_M13, sim_ilid, sim_fresca
-from cytomata.utils import setup_dirs, clear_screen, custom_styles, custom_palette, rescale
+from cytomata.model import sim_itrans, sim_idimer, sim_express, sim_fresca
+from cytomata.utils import setup_dirs, clear_screen, custom_styles, custom_palette
+
+
+def prep_idimer_data(y_csv, u_csv):
+    ydf = pd.read_csv(y_csv)
+    udf = pd.read_csv(u_csv)
+    td = np.around(ydf['t'].values, 1)
+    yd = ydf['y'].values
+    t = np.around(np.arange(td[0], td[-1], 0.1), 1)
+    ydf = interp1d(td, yd)
+    y = np.array([ydf(ti) for ti in t])
+    uta = np.around(udf['ta'].values, 1)
+    utb = np.around(udf['tb'].values, 1)
+    u = np.zeros_like(t)
+    for ta, tb in zip(uta, utb):
+        ia = list(t).index(ta)
+        ib = list(t).index(tb)
+        u[ia:ib] = 1
+    return t, y, u
+
+
+def fit_idimer(t, y, u, save_dir):
+    y0 = [1, 1, y[0]]
+    uf = interp1d(t, u, bounds_error=False, fill_value=0)
+    min_res = 1e15
+    best_params = None
+    iter_t = time.time()
+    def residual(params):
+        tm, ym = sim_idimer(t, y0, uf, params)
+        res = np.sum((ym[2] - y)**2)
+        return  res
+    def opt_iter(params, iter, res):
+        nonlocal min_res, best_params, iter_t
+        clear_screen()
+        ti = time.time()
+        print('seconds/iter:', str(ti - iter_t))
+        iter_t = ti
+        print('Iter: {} | Res: {}'.format(iter, res))
+        print(params.valuesdict())
+        if res < min_res:
+            min_res = res
+            best_params = params.valuesdict()
+        print('Best so far:')
+        print('Res:', str(min_res))
+        print(best_params)
+    params = lm.Parameters()
+    params.add('ku', value=0.1, min=0.0, max=1.0)
+    params.add('kf', value=0.1, min=0.0, max=1.0)
+    params.add('kr', value=0.1, min=0.0, max=1.0)
+    ta = time.time()
+    # results = lm.minimize(
+    #     residual, params, method='differential_evolution',
+    #     iter_cb=opt_iter, nan_policy='propagate', tol=1e-6
+    # )
+    results = lm.minimize(
+        residual, params, method='nelder',
+        iter_cb=opt_iter, nan_policy='propagate', tol=1e-6
+    )
+    print('Elapsed Time: ', str(time.time() - ta))
+    opt_params = results.params.valuesdict()
+    print(opt_params)
+    with open(os.path.join(save_dir, 'opt_params.json'), 'w', encoding='utf-8') as fo:
+        json.dump(opt_params, fo, ensure_ascii=False, indent=4)
+    tm, ym = sim_idimer(t, y0, uf, opt_params)
+    with plt.style.context(('seaborn-whitegrid', custom_styles)), sns.color_palette(custom_palette):
+        fig, (ax0, ax1) = plt.subplots(2, 1, sharex=True, figsize=(16, 10), gridspec_kw={'height_ratios': [1, 8]})
+        ax0.plot(t, u)
+        ax0.set_yticks([0, 1])
+        ax0.set_ylabel('BL')
+        ax1.plot(t, y, color='#ffcdd2', label='Data')
+        ax1.plot(tm, ym[2], color='#d32f2f', label='Model')
+        ax1.set_xlabel('Time (s)')
+        ax1.set_ylabel('AU')
+        ax1.legend(loc='best')
+        fig.tight_layout()
+        fig.canvas.draw()
+        fig.savefig(os.path.join(save_dir, 'fit.png'),
+            dpi=300, bbox_inches='tight', transparent=False, pad_inches=0)
+        plt.close(fig)
+    return opt_params
 
 
 def prep_itranslo_data(y_csv, u_csv):
@@ -93,104 +172,6 @@ def fit_itranslo(t, y, u, results_dir):
         ax1.plot(tm, ym[:, 0], color='#1976D2', label='Cytoplasm (Model)')
         ax1.plot(t, y[:, 1], color='#ffcdd2', label='Nucleus (Data)')
         ax1.plot(tm, ym[:, 1], color='#d32f2f', label='Nucleus (Model)')
-        ax1.set_xlabel('Time (s)')
-        ax1.set_ylabel('AU')
-        ax1.legend(loc='best')
-        fig.tight_layout()
-        fig.canvas.draw()
-        fig.savefig(os.path.join(results_dir, 'fit.png'),
-            dpi=300, bbox_inches='tight', transparent=False, pad_inches=0)
-        plt.close(fig)
-    return opt_params
-
-
-def prep_idimer_data(y_csv, u_csv):
-    ydf = pd.read_csv(y_csv)
-    udf = pd.read_csv(u_csv)
-    td = np.around(ydf['t'].values, 1)
-    yad = ydf['ya'].values
-    ydd = ydf['yd'].values
-    t = np.around(np.arange(td[0], td[-1], 0.1), 1)
-    yaf = interp1d(td, yad)
-    ydf = interp1d(td, ydd)
-    ya = np.array([yaf(ti) for ti in t])
-    yd = np.array([ydf(ti) for ti in t])
-    uta = np.around(udf['ta'].values, 1)
-    utb = np.around(udf['tb'].values, 1)
-    u = np.zeros_like(t)
-    for ta, tb in zip(uta, utb):
-        ia = list(t).index(ta)
-        ib = list(t).index(tb)
-        u[ia:ib] = 1
-    y = np.column_stack([ya, ya, yd])
-    return t, y, u
-
-
-def fit_idimer(t, y, u, results_dir):
-    # ya = (-y + 2*np.min(y) + (np.max(y)-np.min(y)))
-    # y0 = [ya[0], ya[0], y[0]]
-    y0 = [0.5, 0.5, y[0]]
-    uf = interp1d(t, u, bounds_error=False, fill_value=0)
-    min_res = 1e15
-    best_params = None
-    iter_t = time.time()
-    def residual(params):
-        tm, ym = sim_idimer(t, y0, uf, params)
-        res = (ym[:, 2] - y)
-        # res[:600] *= 10
-        res = np.sum(res**2)
-        # res = np.sum((ym[:, 2] - y[:, 2])**2)
-        return  res
-    def opt_iter(params, iter, res):
-        nonlocal min_res, best_params, iter_t
-        clear_screen()
-        ti = time.time()
-        print('seconds/iter:', str(ti - iter_t))
-        iter_t = ti
-        print('Iter: {} | Res: {}'.format(iter, res))
-        print(params.valuesdict())
-        if res < min_res:
-            min_res = res
-            best_params = params.valuesdict()
-        print('Best so far:')
-        print('Res:', str(min_res))
-        print(best_params)
-    # ta = time.time()
-    # params = lm.Parameters()
-    # params.add('kf', min=0, max=0.1, brute_step=0.01)
-    # params.add('kr', min=0, max=0.1, brute_step=0.01)
-    # params.add('ku', min=0, max=1, brute_step=0.1)
-    # results = lm.minimize(
-    #     residual, params, method='brute',
-    #     iter_cb=opt_iter, nan_policy='propagate',
-    # )
-    # params0 = results.params.valuesdict()
-    # params = lm.Parameters()
-    # params.add('kf', value=params0['kf'], min=0, max=0.1)
-    # params.add('kr', value=params0['kr'], min=0, max=0.1)
-    # params.add('ku', value=params0['ku'], min=0, max=1)
-    # ta = time.time()
-    params = lm.Parameters()
-    params.add('kf', value=0.0, min=0.0, max=1.0)
-    params.add('kr', value=0.0, min=0.0, max=1.0)
-    params.add('ku', value=0.0, min=0.0, max=1.0)
-    results = lm.minimize(
-        residual, params, method='differential_evolution',
-        iter_cb=opt_iter, nan_policy='propagate', tol=1e-9
-    )
-    # # print('Elapsed Time: ', str(time.time() - ta))
-    opt_params = results.params.valuesdict()
-    # opt_params = dict([('kf', 0.00015374365541664936), ('kr', 0.003233611739077602), ('ku', 0.03129990345578715)])
-    with open(os.path.join(results_dir, 'opt_params.json'), 'w', encoding='utf-8') as fo:
-        json.dump(opt_params, fo, ensure_ascii=False, indent=4)
-    tm, ym = sim_idimer(t, y0, uf, opt_params)
-    with plt.style.context(('seaborn-whitegrid', custom_styles)), sns.color_palette(custom_palette):
-        fig, (ax0, ax1) = plt.subplots(2, 1, sharex=True, figsize=(16, 10), gridspec_kw={'height_ratios': [1, 8]})
-        ax0.plot(t, u)
-        ax0.set_yticks([0, 1])
-        ax0.set_ylabel('BL')
-        ax1.plot(t, y, color='#ffcdd2', label='AB (Data)')
-        ax1.plot(tm, ym[:, 2], color='#d32f2f', label='AB (Model)')
         ax1.set_xlabel('Time (s)')
         ax1.set_ylabel('AU')
         ax1.legend(loc='best')
@@ -296,6 +277,23 @@ def fit_iexpress(t, y, x, u, results_dir):
 
 
 if __name__ == '__main__':
+    root_dir = '/home/phuong/data/ILID/ddFP/RA-27V/20200921-B3-sspBu_RA-27V_spike/results/'
+    u_csv = os.path.join(root_dir, 'u.csv')
+    y_csv = os.path.join(root_dir, 'y.csv')
+    y_data = pd.read_csv(y_csv)
+    t = y_data['t'].values
+    y = y_data['y_ave'].values
+    yf = interp1d(t, y)
+    t = np.around(np.arange(t[0], t[-1], 0.1), 1)
+    y = np.array([yf(ti) for ti in t])
+    u_data = pd.read_csv(u_csv)
+    tu = u_data['tu_ave'].values
+    u = u_data['u_ave'].values
+    uf = interp1d(tu, u)
+    u = np.array([uf(ti) for ti in t])
+    fit_idimer(t, y, u, root_dir)
+
+
     # y_csv = '/home/phuong/data/LINTAD/LINuS-results/0/y.csv'
     # u_csv = '/home/phuong/data/LINTAD/LINuS/u0.csv'
     # res_dir = '/home/phuong/data/LINTAD/LINuS-results/0/'
@@ -383,39 +381,39 @@ if __name__ == '__main__':
     #     plt.close(fig)
 
 
-    y0 = [0.1, 0, 0.5, 0, 0.05]
-    # uf = interp1d(tu, u, bounds_error=False, fill_value=0)
-    t = np.arange(0, 600)
-    u = np.zeros_like(t)
-    p = 20
-    w = 1
-    for i in range(t[60], t[540], p):
-        u[i:i+w] = 1
-    uf = interp1d(t, u, bounds_error=False, fill_value=0)
-    params = {
-        'k1f': 0.23593737155206962,
-        'k1r': 0.005057247900003281,
-        'k2f': 0.5858908062641166,
-        'k2r': 0.3465577497760164,
-    }
-    tm, ym = sim_fresca(t, y0, uf, params)
-    with plt.style.context(('seaborn-whitegrid', custom_styles)), sns.color_palette(custom_palette):
-        fig, (ax0, ax1) = plt.subplots(2, 1, sharex=True, figsize=(16, 10), gridspec_kw={'height_ratios': [1, 8]})
-        ax0.plot(t, u)
-        ax0.set_yticks([0, 1])
-        ax0.set_ylabel('BL')
-        ax1.plot(tm, ym[:, 1], color='#1976D2', label='iLID_slow')
-        ax1.plot(tm, ym[:, 3], color='#d32f2f', label='iLID_fast')
-        ax1.plot(tm, ym[:, 4], color='#388E3C', label='sspB')
-        ax1.set_xlabel('Time (s)')
-        ax1.set_ylabel('AU')
-        ax1.legend(loc='best')
-        fig.tight_layout()
-        fig.canvas.draw()
-        save_dir = '/home/phuong/data/ILID/FResCA/'
-        fig.savefig(os.path.join(save_dir, 'sim1.png'),
-            dpi=300, bbox_inches='tight', transparent=False)
-        plt.close(fig)
+    # y0 = [0.1, 0, 0.5, 0, 0.05]
+    # # uf = interp1d(tu, u, bounds_error=False, fill_value=0)
+    # t = np.arange(0, 600)
+    # u = np.zeros_like(t)
+    # p = 20
+    # w = 1
+    # for i in range(t[60], t[540], p):
+    #     u[i:i+w] = 1
+    # uf = interp1d(t, u, bounds_error=False, fill_value=0)
+    # params = {
+    #     'k1f': 0.23593737155206962,
+    #     'k1r': 0.005057247900003281,
+    #     'k2f': 0.5858908062641166,
+    #     'k2r': 0.3465577497760164,
+    # }
+    # tm, ym = sim_fresca(t, y0, uf, params)
+    # with plt.style.context(('seaborn-whitegrid', custom_styles)), sns.color_palette(custom_palette):
+    #     fig, (ax0, ax1) = plt.subplots(2, 1, sharex=True, figsize=(16, 10), gridspec_kw={'height_ratios': [1, 8]})
+    #     ax0.plot(t, u)
+    #     ax0.set_yticks([0, 1])
+    #     ax0.set_ylabel('BL')
+    #     ax1.plot(tm, ym[:, 1], color='#1976D2', label='iLID_slow')
+    #     ax1.plot(tm, ym[:, 3], color='#d32f2f', label='iLID_fast')
+    #     ax1.plot(tm, ym[:, 4], color='#388E3C', label='sspB')
+    #     ax1.set_xlabel('Time (s)')
+    #     ax1.set_ylabel('AU')
+    #     ax1.legend(loc='best')
+    #     fig.tight_layout()
+    #     fig.canvas.draw()
+    #     save_dir = '/home/phuong/data/ILID/FResCA/'
+    #     fig.savefig(os.path.join(save_dir, 'sim1.png'),
+    #         dpi=300, bbox_inches='tight', transparent=False)
+    #     plt.close(fig)
 
 
     # y_csv = '/home/phuong/data/ILID/RA-HF/20200804-RA-HF/results/5/y.csv'
