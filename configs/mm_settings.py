@@ -48,32 +48,32 @@ SETTINGS = {
 
 
 # Minutes-Timescale ##
-# IMAGING = {
-#     't_info': [(0, 301, 5)],
-#     'chs': ['mCherry']
-# }
-
-# INDUCTION = {
-#     't_info': [(60, 300, 5, 1)],
-#     'ch_ind': 'BL10'
-# }
-
-
-# Hours-Timescale ## 
 IMAGING = {
-    't_info': [(0, 43201, 300)],
-    'chs': ['mCherry', 'DIC']
+    't_info': [(0, 301, 5)],
+    'chs': ['mCherry']
 }
 
 INDUCTION = {
-    't_info': [(0, 3600, 300, 295)],
+    't_info': [(60, 300, 5, 1)],
     'ch_ind': 'BL10'
 }
 
-AUTOFOCUS = {
-    't_info': [(0, 43200, 300)],
-    'ch': 'DIC',
-    'bounds': [-20.0, 20.0],
-    'z_step': 5.0,
-    'offset': 0
-}
+
+# Hours-Timescale ## 
+# IMAGING = {
+#     't_info': [(0, 43201, 300)],
+#     'chs': ['mCherry', 'DIC']
+# }
+
+# INDUCTION = {
+#     't_info': [(0, 3600, 300, 295)],
+#     'ch_ind': 'BL10'
+# }
+
+# AUTOFOCUS = {
+#     't_info': [(0, 43200, 300)],
+#     'ch': 'DIC',
+#     'bounds': [-20.0, 20.0],
+#     'z_step': 5.0,
+#     'offset': 0
+# }

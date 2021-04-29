@@ -28,10 +28,12 @@ mscope.core.set_auto_shutter(False)
 mscope.core.set_shutter_open(False)
 img = mscope.snap_image()
 mscope.core.set_exposure(exp0)
+mscope.core.set_auto_shutter(True)
+
+mscope.core.set_roi(300, 300, 600, 600)
 
 if SETTINGS['mpos']:
     mscope.add_coords_session(SETTINGS['mpos_ch'])
-
 
 # Event Loop
 if SETTINGS['mpos'] == 'sequential':
@@ -64,3 +66,5 @@ else:
             break
         else:
             time.sleep(0.001)
+
+mscope.core.clear_roi()
