@@ -29,6 +29,7 @@ mscope.core.set_shutter_open(False)
 img = mscope.snap_image()
 mscope.core.set_exposure(exp0)
 mscope.core.set_auto_shutter(True)
+mscope.core.clear_roi()
 
 mscope.core.set_roi(300, 300, 600, 600)
 
@@ -38,14 +39,14 @@ if SETTINGS['mpos']:
 # Event Loop
 if SETTINGS['mpos'] == 'sequential':
     for cid in range(len(mscope.coords)):
-        mscope.cid = cid
-        mscope.t0 = time.time()
         if IMAGING:
             mscope.queue_imaging(**IMAGING)
         if INDUCTION:
             mscope.queue_induction(**INDUCTION)
         if AUTOFOCUS:
             mscope.queue_autofocus(**AUTOFOCUS)
+        mscope.cid = cid
+        mscope.t0 = time.time()
         while True:
             done = mscope.run_tasks()
             if done:
@@ -53,13 +54,13 @@ if SETTINGS['mpos'] == 'sequential':
             else:
                 time.sleep(0.001)
 else:
-    mscope.t0 = time.time()
     if IMAGING:
         mscope.queue_imaging(**IMAGING)
     if INDUCTION:
         mscope.queue_induction(**INDUCTION)
     if AUTOFOCUS:
         mscope.queue_autofocus(**AUTOFOCUS)
+    mscope.t0 = time.time()
     while True:
         done = mscope.run_tasks()
         if done:

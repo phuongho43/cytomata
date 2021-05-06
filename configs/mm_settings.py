@@ -31,7 +31,7 @@ SETTINGS = {
 
 # INDUCTION = {
 #     't_info': [(60, 61, 1, 1)],  # (start, stop, period, width)
-#     'ch_ind': 'BL100'
+#     'ch_ind': 'BL1'
 # }
 
 
@@ -54,7 +54,7 @@ IMAGING = {
 }
 
 INDUCTION = {
-    't_info': [(60, 300, 5, 1)],
+    't_info': [(60, 300, 10, 1)],
     'ch_ind': 'BL10'
 }
 
@@ -62,7 +62,7 @@ INDUCTION = {
 # Hours-Timescale ## 
 # IMAGING = {
 #     't_info': [(0, 43201, 300)],
-#     'chs': ['mCherry', 'DIC']
+#     'chs': ['mCherry', 'YFP']
 # }
 
 # INDUCTION = {
@@ -74,6 +74,6 @@ INDUCTION = {
 #     't_info': [(0, 43200, 300)],
 #     'ch': 'DIC',
 #     'bounds': [-20.0, 20.0],
-#     'z_step': 5.0,
+#     'z_step': 10.0,
 #     'offset': 0
 # }

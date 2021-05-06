@@ -181,10 +181,9 @@ class Microscope(object):
 
     def queue_imaging(self, t_info, chs):
         for (start, stop, period) in t_info:
-            times = deque(np.arange(start + self.t0, stop + self.t0, period))
             self.tasks.append({
                 'func': self.imaging_task,
-                'times': times,
+                'times': deque(np.arange(start, stop, period)),
                 'kwargs': {'chs': chs}
             })
         for ch in chs:
@@ -218,10 +217,9 @@ class Microscope(object):
 
     def queue_induction(self, t_info, ch_ind):
         for (start, stop, period, width) in t_info:
-            times = deque(np.arange(start + self.t0, stop + self.t0, period))
             self.tasks.append({
                 'func': self.induction_task,
-                'times': times,
+                'times': deque(np.arange(start, stop, period)),
                 'kwargs': {'width': width, 'ch_ind': ch_ind}
             })
 
@@ -258,10 +256,9 @@ class Microscope(object):
 
     def queue_autofocus(self, t_info, ch, bounds, z_step, offset):
         for (start, stop, period) in t_info:
-            times = deque(np.arange(start + self.t0, stop + self.t0, period))
             self.tasks.append({
                 'func': self.autofocus_task,
-                'times': times,
+                'times': deque(np.arange(start, stop, period)),
                 'kwargs': {'ch': ch, 'bounds': bounds, 'z_step': z_step, 'offset': offset}
             })
 
@@ -269,7 +266,7 @@ class Microscope(object):
         if self.tasks:
             for i, task in enumerate(self.tasks):
                 if task['times']:
-                    if time.time() > task['times'][0]:
+                    if time.time() > task['times'][0] + self.t0:
                         task['func'](**task['kwargs'])
                         self.tasks[i]['times'].popleft()
                 else:
