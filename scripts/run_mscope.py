@@ -21,6 +21,7 @@ shutil.copyfile(MM_CFG_FILE, cfg_file_save)
 
 
 mscope = Microscope(SETTINGS, MM_CFG_FILE)
+mscope.core.clear_roi()
 exp0 = mscope.core.get_exposure()
 mscope.core.set_exposure(0)
 mscope.set_channel('BL1')
@@ -29,9 +30,9 @@ mscope.core.set_shutter_open(False)
 img = mscope.snap_image()
 mscope.core.set_exposure(exp0)
 mscope.core.set_auto_shutter(True)
-mscope.core.clear_roi()
+mscope.set_channel(IMAGING['chs'][0])
 
-mscope.core.set_roi(300, 300, 600, 600)
+# mscope.core.set_roi(300, 300, 600, 600)
 
 if SETTINGS['mpos']:
     mscope.add_coords_session(SETTINGS['mpos_ch'])
