@@ -23,7 +23,7 @@ def iter_cb(img, prog):
     return False
 
 def process_fluo_timelapse(img_dir, save_dir, u_csv=None,
-    t_unit='s', ulabel='BL', sb_microns=22, cmax=None,
+    t_unit='s', ulabel='BL', sb_microns=11, cmax=None,
     segmt=False, segmt_dots=False, segmt_mask=None, segmt_factor=1,
     remove_small=None, fill_holes=None, clear_border=None, adj_bright=False, iter_cb=iter_cb):
     """Analyze fluorescence timelapse images and generate figures."""
@@ -148,13 +148,12 @@ def combine_uy(root_dir, fold_change=True, plot_u=True):
 
 
 def process_fluo_images(img_dir, save_dir,
-    sb_microns=22, cmax=None, segmt=False, segmt_dots=False,
+    sb_microns=11, cmax=None, segmt=False, segmt_dots=False,
     segmt_mask_dir='', segmt_factor=1, remove_small=None,
-    fill_holes=None, clear_border=None, iter_cb=iter_cb):
+    fill_holes=None, clear_border=None, quant='sum', iter_cb=iter_cb):
     """Analyze fluorescence 10x images and generate figures."""
     if cmax is None:
-        cmax = 1*np.max([np.percentile(img_as_float(imread(imgf)), 99.9) for imgf in list_img_files(img_dir)])
-        cmax = 1 if cmax > 1 else cmax
+        cmax = np.max([np.percentile(img_as_float(imread(imgf)), 99.9) for imgf in list_img_files(img_dir)])
     n_imgs = len(list_img_files(img_dir))
     y = []
     imgs = []
@@ -163,7 +162,10 @@ def process_fluo_images(img_dir, save_dir,
         img, raw, bkg, den = preprocess_img(imgf)
         plot_bkg_profile(fname, save_dir, raw, bkg)
         thr = None
-        yi = np.mean(img)
+        if quant == 'sum':
+            yi = np.sum(img)
+        else:
+            yi = np.mean(img)
         if segmt:
             segmt_mask = ''
             if segmt_mask_dir is not None:
@@ -177,7 +179,10 @@ def process_fluo_images(img_dir, save_dir,
                     rs=remove_small, fh=fill_holes, cb=clear_border)
             if os.path.isfile(segmt_mask) and os.path.exists(segmt_mask):
                 thr *= seg_bound
-            yi = np.mean(img[thr])
+            if quant == 'sum':
+                yi = np.sum(img[thr])
+            else:
+                yi = np.mean(img[thr])
             if np.isnan(yi):
                 yi = 0
         y.append(yi)
@@ -225,29 +230,28 @@ def barplot_expts(root_dir):
 
 
 if __name__ == '__main__':
-    i = 0
-    root_dir = '/home/phuong/data/LINUS/LINX/20210428_mCh-LINX0_BL10-1s-5s/'
-    img_ch = 'mCherry'
-    # save_dir = os.path.join(root_dir, img_ch + '-results', str(i))
-    save_dir = os.path.join(root_dir, 'results', str(i))
-    img_dir = os.path.join(root_dir, img_ch, str(i))
+    # i = 0
+    # root_dir = '/home/phuong/data/ILID/ddFP/RA-WT/20210503_B3-sspBn_RA-iLID_BL1-1s_7/'
+    # img_ch = 'mCherry'
+    # # save_dir = os.path.join(root_dir, img_ch + '-results', str(i))
+    # save_dir = os.path.join(root_dir, 'results', str(i))
+    # img_dir = os.path.join(root_dir, img_ch, str(i))
     # u_csv = os.path.join(root_dir, 'u{}.csv'.format(i))
-    u_csv = os.path.join(root_dir, 'u{}.csv'.format(i))
-    mask = os.path.join(root_dir, 'mask.tif')
-    process_fluo_timelapse(img_dir, save_dir, u_csv='',
-        t_unit='s', ulabel='BL', sb_microns=11, cmax=None,
-        segmt=False, segmt_dots=False, segmt_mask=mask, segmt_factor=3.0,
-        remove_small=6000, fill_holes=None, clear_border=0, adj_bright=True)
+    # mask = os.path.join(root_dir, 'mask.tif')
+    # process_fluo_timelapse(img_dir, save_dir, u_csv=u_csv,
+    #     t_unit='s', ulabel='BL', sb_microns=11, cmax=None,
+    #     segmt=True, segmt_dots=False, segmt_mask=mask, segmt_factor=1.0,
+    #     remove_small=6000, fill_holes=None, clear_border=0, adj_bright=True)
 
-    # root_dir = '/home/phuong/data/ILID/ddFP/RA-27V/20200921-B3-sspBu_RA-27V_spike/results/'
+    # root_dir = '/home/phuong/data/ILID/ddFP/RA-WT/20210503_B3-sspBn_RA-iLID_BL1-1s/results/'
     # combine_uy(root_dir, fold_change=False, plot_u=True)
     
-    # root_dir = '/home/phuong/data/ERT2/20210417/20210417_pMN333_4OHT_t0/'
-    # img_dir = os.path.join(root_dir, 'Default')
-    # save_dir = os.path.join(root_dir, 'results')
-    # process_fluo_images(img_dir, save_dir,
-    #     sb_microns=160, cmax=None, segmt=False, segmt_dots=False, segmt_mask_dir='',
-    #     segmt_factor=0.5, remove_small=15, fill_holes=None, clear_border=None)
+    root_dir = '/home/phuong/data/ERT2/20210417/20210417_pMN333_4OHT_t0/'
+    img_dir = os.path.join(root_dir, 'Default')
+    save_dir = os.path.join(root_dir, 'results')
+    process_fluo_images(img_dir, save_dir,
+        sb_microns=220, cmax=None, segmt=True, segmt_dots=False, segmt_mask_dir='',
+        segmt_factor=1.0, remove_small=15, fill_holes=None, clear_border=None, quant='sum')
 
     # root_dir = '/home/phuong/data/LINUS/LINUS/GEx/20210301/'
     # # compare_before_after(root_dir)

@@ -64,14 +64,14 @@ def fit_idimer(t, y, u, save_dir):
     params.add('kf', value=0.1, min=0.0, max=1.0)
     params.add('kr', value=0.1, min=0.0, max=1.0)
     ta = time.time()
-    # results = lm.minimize(
-    #     residual, params, method='differential_evolution',
-    #     iter_cb=opt_iter, nan_policy='propagate', tol=1e-6
-    # )
     results = lm.minimize(
-        residual, params, method='nelder',
+        residual, params, method='differential_evolution',
         iter_cb=opt_iter, nan_policy='propagate', tol=1e-6
     )
+    # results = lm.minimize(
+    #     residual, params, method='powell',
+    #     iter_cb=opt_iter, nan_policy='propagate', tol=1e-6
+    # )
     print('Elapsed Time: ', str(time.time() - ta))
     opt_params = results.params.valuesdict()
     print(opt_params)
@@ -277,11 +277,11 @@ def fit_iexpress(t, y, x, u, results_dir):
 
 
 if __name__ == '__main__':
-    root_dir = '/home/phuong/data/ILID/ddFP/RA-27V/20200921-B3-sspBu_RA-27V_spike/results/'
+    root_dir = '/home/phuong/data/ILID/ddFP/RA-WT/20210503_B3-sspBn_RA-iLID_BL1-1s/results/'
     u_csv = os.path.join(root_dir, 'u.csv')
     y_csv = os.path.join(root_dir, 'y.csv')
     y_data = pd.read_csv(y_csv)
-    t = y_data['t'].values
+    t = y_data['t_ave'].values
     y = y_data['y_ave'].values
     yf = interp1d(t, y)
     t = np.around(np.arange(t[0], t[-1], 0.1), 1)

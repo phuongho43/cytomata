@@ -25,14 +25,14 @@ def preprocess_img(imgf):
     den = denoise_nl_means(img, h=sig, sigma=sig, patch_size=3, patch_distance=5)
     bkg = den.copy()
     rfrac = np.percentile(bkg, 25)/np.percentile(bkg, 75)
-    tval = threshold_li(bkg) * 1.25
-    broi = bkg*(bkg < tval)
     rfrac = np.max([rfrac, 0.5])
+    tval = threshold_li(bkg)
+    broi = bkg*(bkg < tval)
     tval = np.percentile(broi, rfrac*100)
     bkg[bkg >= tval] = tval
-    bkg = gaussian(bkg, 64) + 2*sig
+    bkg = gaussian(bkg, 64) + sig
     bkg[bkg < 0] = 0
-    img = img - bkg
+    img = img - bkg 
     img[img < 0] = 0
     den = den - bkg
     den[den < 0] = 0
