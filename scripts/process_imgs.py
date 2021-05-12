@@ -230,28 +230,29 @@ def barplot_expts(root_dir):
 
 
 if __name__ == '__main__':
-    # i = 0
-    # root_dir = '/home/phuong/data/ILID/ddFP/RA-WT/20210503_B3-sspBn_RA-iLID_BL1-1s_7/'
-    # img_ch = 'mCherry'
-    # # save_dir = os.path.join(root_dir, img_ch + '-results', str(i))
+    i = 0
+    root_dir = '/home/phuong/data/ILID/GEx/LexA-4KE4/20210417_6TetO-mScI_6LexO-mGold_NLS-sspBn-VPR_TetR-NLS-16I_LexA-NLS-4KE4-iLID_BL10-1s-10s/'
+    img_ch = 'YFP'
+    save_dir = os.path.join(root_dir, img_ch + '-results', str(i))
     # save_dir = os.path.join(root_dir, 'results', str(i))
-    # img_dir = os.path.join(root_dir, img_ch, str(i))
+    img_dir = os.path.join(root_dir, img_ch, str(i))
     # u_csv = os.path.join(root_dir, 'u{}.csv'.format(i))
-    # mask = os.path.join(root_dir, 'mask.tif')
-    # process_fluo_timelapse(img_dir, save_dir, u_csv=u_csv,
-    #     t_unit='s', ulabel='BL', sb_microns=11, cmax=None,
-    #     segmt=True, segmt_dots=False, segmt_mask=mask, segmt_factor=1.0,
-    #     remove_small=6000, fill_holes=None, clear_border=0, adj_bright=True)
+    u_csv = ''
+    mask = os.path.join(root_dir, 'mask.tif')
+    process_fluo_timelapse(img_dir, save_dir, u_csv=u_csv,
+        t_unit='s', ulabel='BL', sb_microns=220, cmax=None,
+        segmt=False, segmt_dots=False, segmt_mask=mask, segmt_factor=1.0,
+        remove_small=6000, fill_holes=None, clear_border=0, adj_bright=True)
 
     # root_dir = '/home/phuong/data/ILID/ddFP/RA-WT/20210503_B3-sspBn_RA-iLID_BL1-1s/results/'
     # combine_uy(root_dir, fold_change=False, plot_u=True)
     
-    root_dir = '/home/phuong/data/ERT2/20210417/20210417_pMN333_4OHT_t0/'
-    img_dir = os.path.join(root_dir, 'Default')
-    save_dir = os.path.join(root_dir, 'results')
-    process_fluo_images(img_dir, save_dir,
-        sb_microns=220, cmax=None, segmt=True, segmt_dots=False, segmt_mask_dir='',
-        segmt_factor=1.0, remove_small=15, fill_holes=None, clear_border=None, quant='sum')
+    # root_dir = '/home/phuong/data/20210511_nate/'
+    # img_dir = os.path.join(root_dir, 'imgs')
+    # save_dir = os.path.join(root_dir, 'results')
+    # process_fluo_images(img_dir, save_dir,
+    #     sb_microns=220, cmax=None, segmt=True, segmt_dots=False, segmt_mask_dir='',
+    #     segmt_factor=0.5, remove_small=50, fill_holes=None, clear_border=None, quant='sum')
 
     # root_dir = '/home/phuong/data/LINUS/LINUS/GEx/20210301/'
     # # compare_before_after(root_dir)

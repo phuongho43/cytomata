@@ -8,11 +8,12 @@ from skimage import img_as_float
 from skimage.io import imread
 from skimage.measure import label
 from skimage.filters import (gaussian, laplace, median,
-    threshold_li, threshold_yen, threshold_otsu)
+    threshold_li, threshold_yen, threshold_otsu, threshold_local)
 from skimage.morphology import (remove_small_objects, remove_small_holes,
     disk, binary_erosion, binary_opening)
 from skimage.restoration import denoise_nl_means, estimate_sigma
 from skimage.segmentation import clear_border
+from skimage.exposure import is_low_contrast
 
 from cytomata.utils import setup_dirs
 
@@ -25,12 +26,13 @@ def preprocess_img(imgf):
     den = denoise_nl_means(img, h=sig, sigma=sig, patch_size=3, patch_distance=5)
     bkg = den.copy()
     rfrac = np.percentile(bkg, 25)/np.percentile(bkg, 75)
-    rfrac = np.max([rfrac, 0.5])
-    tval = threshold_li(bkg)
-    broi = bkg*(bkg < tval)
+    if is_low_contrast(bkg, 0.1):
+        rfrac = 1
+    thr = threshold_local(bkg, block_size=9, param=36)
+    broi = bkg*(bkg < thr)
     tval = np.percentile(broi, rfrac*100)
     bkg[bkg >= tval] = tval
-    bkg = gaussian(bkg, 64) + sig
+    bkg = gaussian(bkg, 36) + 0.2*sig
     bkg[bkg < 0] = 0
     img = img - bkg 
     img[img < 0] = 0
