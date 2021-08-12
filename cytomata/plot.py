@@ -17,7 +17,7 @@ def plot_cell_img(img, thr, fname, save_dir, cmax, sig_ann=False, t_unit=None, s
     setup_dirs(os.path.join(save_dir, 'imgs'))
     with plt.style.context(('seaborn-whitegrid', custom_styles)), sns.color_palette(custom_palette):
         fig, ax = plt.subplots(figsize=(10,8))
-        axim = ax.imshow(img, cmap='turbo')
+        axim = ax.imshow(img, cmap='inferno')
         axim.set_clim(0.0, cmax)
         if t_unit:
             t_text = 't = ' + fname + t_unit
@@ -31,7 +31,7 @@ def plot_cell_img(img, thr, fname, save_dir, cmax, sig_ann=False, t_unit=None, s
         if sig_ann:
             w, h = img.shape
             ax.add_patch(Rectangle((3, 3), w-7, h-7,
-                linewidth=5, edgecolor='#00B0FF', facecolor='none'))
+                linewidth=5, edgecolor='#2196F3', facecolor='none'))
         ax.grid(False)
         ax.axis('off')
         cb = fig.colorbar(axim, pad=0.01, format='%.3f',

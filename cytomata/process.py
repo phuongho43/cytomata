@@ -17,6 +17,8 @@ from skimage.exposure import is_low_contrast
 
 from cytomata.utils import setup_dirs
 
+import matplotlib.pyplot as plt
+import time
 
 def preprocess_img(imgf):
     """Subtract background and denoise fluorescence image."""
@@ -24,17 +26,23 @@ def preprocess_img(imgf):
     raw = img.copy()
     sig = estimate_sigma(img)
     den = denoise_nl_means(img, h=sig, sigma=sig, patch_size=3, patch_distance=5)
+    raw = den.copy()
     bkg = den.copy()
-    rfrac = np.percentile(bkg, 25)/np.percentile(bkg, 75)
-    if is_low_contrast(bkg, 0.1):
+    thr = threshold_local(bkg, block_size=5, param=24)
+    thr = median(bkg < thr, selem=disk(3))
+    broi = bkg*thr
+    rfrac = np.percentile(img, 25)/np.percentile(img, 75)
+    if rfrac < 0.5:
+        rfrac = 0.5
+    if np.std(bkg)/np.mean(bkg) < 0.05:
         rfrac = 1
-    thr = threshold_local(bkg, block_size=9, param=36)
-    broi = bkg*(bkg < thr)
+    print(rfrac)
+    # rfrac=0.7
     tval = np.percentile(broi, rfrac*100)
     bkg[bkg >= tval] = tval
-    bkg = gaussian(bkg, 36) + 0.2*sig
+    bkg = gaussian(bkg, 64)
     bkg[bkg < 0] = 0
-    img = img - bkg 
+    img = img - bkg
     img[img < 0] = 0
     den = den - bkg
     den[den < 0] = 0
