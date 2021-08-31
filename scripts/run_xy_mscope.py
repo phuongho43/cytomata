@@ -33,42 +33,5 @@ img = mscope.snap_image()
 mscope.core.set_exposure(exp0)
 mscope.core.set_auto_shutter(True)
 
-if SETTINGS['roi_center']:
-    mscope.core.set_roi(300, 300, 600, 600)
 
-if SETTINGS['mpos']:
-    mscope.add_coords_session(SETTINGS['mpos_ch'])
-
-# Event Loop
-if SETTINGS['mpos'] == 'sequential':
-    for cid in range(len(mscope.coords)):
-        if IMAGING:
-            mscope.queue_imaging(**IMAGING)
-        if INDUCTION:
-            mscope.queue_induction(**INDUCTION)
-        if AUTOFOCUS:
-            mscope.queue_autofocus(**AUTOFOCUS)
-        mscope.cid = cid
-        mscope.t0 = time.time()
-        while True:
-            done = mscope.run_tasks()
-            if done:
-                break
-            else:
-                time.sleep(0.001)
-else:
-    if IMAGING:
-        mscope.queue_imaging(**IMAGING)
-    if INDUCTION:
-        mscope.queue_induction(**INDUCTION)
-    if AUTOFOCUS:
-        mscope.queue_autofocus(**AUTOFOCUS)
-    mscope.t0 = time.time()
-    while True:
-        done = mscope.run_tasks()
-        if done:
-            break
-        else:
-            time.sleep(0.001)
-
-mscope.core.clear_roi()
+mscope.snap_xyfield(chs=['DIC', 'YFP'], n=3, step=1320)

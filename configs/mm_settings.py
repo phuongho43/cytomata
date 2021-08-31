@@ -20,60 +20,61 @@ SETTINGS = {
     'stage_y_limit': [-9600, 9600],
     'mpos': '', # '', 'sequential', 'parallel'
     'mpos_ch': 'mCherry',
+    'roi_center': False,
 }
 
 
-## Seconds-Timescale ##
+# Seconds-Timescale ##
+IMAGING = {
+    't_info': [(0, 56, 5), (60, 62, 1), (65, 181, 5)],  # (start, stop, period)
+    'chs': ['mCherry']
+}
+
+INDUCTION = {
+    't_info': [(60, 61, 1, 1)],  # (start, stop, period, width)
+    'ch_ind': 'BL1'
+}
+
+
+# Seconds-Timescale ## Pulsatile ##
 # IMAGING = {
-#     't_info': [(0, 56, 5), (60, 62, 1), (65, 181, 5)],  # (start, stop, period)
+#     't_info': [(0, 181, 5)],  # (start, stop, period)
 #     'chs': ['mCherry']
 # }
 
 # INDUCTION = {
-#     't_info': [(60, 61, 1, 1)],  # (start, stop, period, width)
+#     't_info': [(60, 91, 3, 1)],  # (start, stop, period, width)
 #     'ch_ind': 'BL1'
-# }
-
-
-## Seconds-Timescale ## Pulsatile ##
-# IMAGING = {
-#     't_info': [(0, 301, 5)],  # (start, stop, period)
-#     'chs': ['mCherry']
-# }
-
-# INDUCTION = {
-#     't_info': [(60, 181, 5, 1)],  # (start, stop, period, width)
-#     'ch_ind': 'BL10'
 # }
 
 
 # Minutes-Timescale ##
 # IMAGING = {
-#     't_info': [(0, 301, 5)],
-#     'chs': ['mCherry']
+#     't_info': [(0, 301, 10)],
+#     'chs': ['mCherry', 'CFP']
 # }
 
 # INDUCTION = {
-#     't_info': [(60, 300, 5, 1)],
-#     'ch_ind': 'BL10'
+#     't_info': [(60, 300, 10, 8)],
+#     'ch_ind': 'BL1'
 # }
 
 
 # Hours-Timescale ## 
-IMAGING = {
-    't_info': [(0, 43201, 300)],
-    'chs': ['DIC', 'mCherry', 'YFP']
-}
+# IMAGING = {
+#     't_info': [(0, 57601, 300)],
+#     'chs': ['DIC', 'TxRed']
+# }
 
-INDUCTION = {
-    't_info': [(0, 43200, 60, 1)],
-    'ch_ind': 'BL1'
-}
+# INDUCTION = {
+#     't_info': [(0, 57600, 10, 1)],
+#     'ch_ind': 'BL1'
+# }
 
-AUTOFOCUS = {
-    't_info': [(0, 43200, 300)],
-    'ch': 'DIC',
-    'bounds': [-20.0, 20.0],
-    'z_step': 10.0,
-    'offset': 0
-}
+# AUTOFOCUS = {
+#     't_info': [(0, 57600, 300)],
+#     'ch': 'DIC',
+#     'bounds': [-20.0, 20.0],
+#     'z_step': 10.0,
+#     'offset': 5
+# }

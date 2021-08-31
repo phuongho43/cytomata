@@ -133,9 +133,8 @@ class Microscope(object):
                 imsave(os.path.join(ch_dir, str(z) + '.tiff'), img)
         self.set_position('z', z0)
 
-    def snap_xyfield(self, chs, n=5, step=81.92):
-        x0 = self.get_position('x')
-        y0 = self.get_position('y')
+    def snap_xyfield(self, chs, n=3, step=132):
+        x0, y0 = self.get_position('xy')
         grid = np.arange(-(n//2)*step, (n//2)*step + step, step)
         tstamp = time.strftime('%Y%m%d-%H%M%S')
         img_dir = os.path.join(self.save_dir, tstamp + '_xyfield')
@@ -240,7 +239,8 @@ class Microscope(object):
             if foc > best_foc:
                 best_foc = foc
                 best_pos = zz
-        self.coords[cid, 2] = best_pos + offset
+        best_pos += offset
+        self.coords[cid, 2] = best_pos
         self.set_position('z', best_pos)
 
     def autofocus_task(self, ch, bounds, z_step, offset):
