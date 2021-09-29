@@ -17,7 +17,7 @@ def plot_cell_img(img, thr, fname, save_dir, cmax, sig_ann=False, t_unit=None, s
     setup_dirs(os.path.join(save_dir, 'imgs'))
     with plt.style.context(('seaborn-whitegrid', custom_styles)), sns.color_palette(custom_palette):
         fig, ax = plt.subplots(figsize=(10,8))
-        axim = ax.imshow(img, cmap='inferno')
+        axim = ax.imshow(img, cmap='turbo')
         axim.set_clim(0.0, cmax)
         if t_unit:
             t_text = 't = ' + fname + t_unit
@@ -31,7 +31,7 @@ def plot_cell_img(img, thr, fname, save_dir, cmax, sig_ann=False, t_unit=None, s
         if sig_ann:
             w, h = img.shape
             ax.add_patch(Rectangle((3, 3), w-7, h-7,
-                linewidth=5, edgecolor='#2196F3', facecolor='none'))
+                linewidth=5, edgecolor='#648FFF', facecolor='none'))
         ax.grid(False)
         ax.axis('off')
         cb = fig.colorbar(axim, pad=0.01, format='%.3f',
@@ -65,7 +65,7 @@ def plot_bkg_profile(fname, save_dir, img, bkg):
         plt.close(fig)
 
 
-def plot_uy(t, y, tu, u, save_dir, t_unit='s', ulabel='BL'):
+def plot_uy(t, y, tu, u, save_dir, t_unit='s', ulabel='stim.'):
     setup_dirs(save_dir)
     t = np.array(t)
     y = np.array(y)
@@ -82,15 +82,15 @@ def plot_uy(t, y, tu, u, save_dir, t_unit='s', ulabel='BL'):
             ax0.set_ylabel(ulabel)
         else:
             fig, ax = plt.subplots(figsize=(16,8))
-        ax.plot(t, y, color='#d32f2f')
+        ax.plot(t, y, color='#785EF0')
         ax.set_xlabel('Time ({})'.format(t_unit))
-        ax.set_ylabel('Ave Fl. Intensity')
+        ax.set_ylabel('AU')
         ytiks, ystep = np.linspace(np.min(y), np.max(y), 6, endpoint=True, retstep=True)
         ylim = (ytiks[0] - ystep/4, ytiks[-1] + ystep/4)
         ax.set_yticks(ytiks)
         ax.set_ylim(ylim)
         ax1 = ax.twinx()
-        ax1.plot(t, y/np.mean(y[:3]), color='#d32f2f')
+        ax1.plot(t, y/np.mean(y[:3]), color='#785EF0')
         ax1.set_yticks(ytiks/np.mean(y[:3]))
         ax1.set_ylim(ylim/np.mean(y[:3]))
         ax1.yaxis.set_major_formatter(FormatStrFormatter('%.3f'))

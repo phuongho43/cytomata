@@ -14,18 +14,18 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from natsort import natsorted
 from scipy.interpolate import interp1d
+from matplotlib.ticker import LogLocator, NullFormatter
+import matplotlib.patches as patches
 
 from cytomata.plot import plot_cell_img, plot_bkg_profile, plot_uy
 from cytomata.process import preprocess_img, segment_object, segment_clusters, process_u_csv
 from cytomata.utils import list_img_files, custom_styles, custom_palette
 
-def iter_cb(img, prog):
-    return False
 
 def process_fluo_timelapse(img_dir, save_dir, u_csv=None,
     t_unit='s', ulabel='BL', sb_microns=11, cmax=None,
     segmt=False, segmt_dots=False, segmt_mask=None, segmt_factor=1,
-    remove_small=None, fill_holes=None, clear_border=None, adj_bright=False, iter_cb=iter_cb):
+    remove_small=None, fill_holes=None, clear_border=None, adj_bright=False):
     """Analyze fluorescence timelapse images and generate figures."""
     if cmax is None:
         cmax = np.max([np.percentile(img_as_float(imread(imgf)), 99.9) for imgf in list_img_files(img_dir)])
@@ -73,8 +73,6 @@ def process_fluo_timelapse(img_dir, save_dir, u_csv=None,
             cmax, sig_ann, t_unit=t_unit, sb_microns=sb_microns)
         imgs.append(cell_img)
         prog = (i+1)/n_imgs * 100
-        if iter_cb(cell_img, prog):
-            break
     plot_uy(t, y, tu, u, save_dir, t_unit=t_unit, ulabel=ulabel)
     data = np.column_stack((t, y))
     np.savetxt(os.path.join(save_dir, 'y.csv'),
@@ -130,15 +128,15 @@ def combine_uy(root_dir, fold_change=True, plot_u=True):
         y_data.to_csv(os.path.join(root_dir, 'y.csv'), index=False)
         y_ave = y_data['y_ave']
         y_ci = y_data['y_sem']*1.96
-        ax.fill_between(t, (y_ave - y_ci), (y_ave + y_ci), color='#1976D2', alpha=.2, label='95% CI')
-        ax.plot(y_ave, color='#1976D2', label='Ave')
+        ax.fill_between(t, (y_ave - y_ci), (y_ave + y_ci), color='#648FFF', alpha=.2, label='95% CI')
+        ax.plot(y_ave, color='#648FFF', label='Ave')
         ax.set_xlabel('Time (s)')
         ax.set_ylabel('AU')
         if fold_change:
             ax.set_ylabel('Fold Change')
         # ax.legend(loc='best')
         if plot_u:
-            ax0.plot(tu, u, color='#1976D2')
+            ax0.plot(tu, u, color='#648FFF')
             ax0.set_yticks([0, 1])
             ax0.set_ylabel('BL')
         plot_name = 'y.png'
@@ -149,8 +147,8 @@ def combine_uy(root_dir, fold_change=True, plot_u=True):
 
 def process_fluo_images(img_dir, save_dir,
     sb_microns=11, cmax=None, segmt=False, segmt_dots=False,
-    segmt_mask_dir='', segmt_factor=1, remove_small=None,
-    fill_holes=None, clear_border=None, quant='sum', iter_cb=iter_cb):
+    segmt_mask='', segmt_factor=1, remove_small=None,
+    fill_holes=None, clear_border=None):
     """Analyze fluorescence 10x images and generate figures."""
     if cmax is None:
         cmax = np.max([np.percentile(img_as_float(imread(imgf)), 99.999) for imgf in list_img_files(img_dir)])
@@ -164,14 +162,11 @@ def process_fluo_images(img_dir, save_dir,
         cmax = np.percentile(img, 99.999)
         plot_bkg_profile(fname, save_dir, raw, bkg)
         thr = None
-        if quant == 'sum':
-            yi = np.sum(img)
-        else:
-            yi = np.mean(img)
+        yi = np.mean(img)
         if segmt:
             segmt_mask = ''
-            if segmt_mask_dir is not None:
-                segmt_mask = os.path.join(segmt_mask_dir, fname)
+            if segmt_mask is not None:
+                segmt_mask = os.path.join(segmt_mask)
             if os.path.isfile(segmt_mask) and os.path.exists(segmt_mask):
                 seg_bound = img_as_float(imread(segmt_mask)) > 0
             if segmt_dots:
@@ -181,18 +176,13 @@ def process_fluo_images(img_dir, save_dir,
                     rs=remove_small, fh=fill_holes, cb=clear_border)
             if os.path.isfile(segmt_mask) and os.path.exists(segmt_mask):
                 thr *= seg_bound
-            if quant == 'sum':
-                yi = np.sum(img[thr])
-            else:
-                yi = np.mean(img[thr])
+            yi = np.mean(img[thr])
             if np.isnan(yi):
                 yi = 0
         y.append(yi)
         cell_img = plot_cell_img(den, thr, fname, save_dir,
             cmax, sig_ann=False, t_unit=None, sb_microns=sb_microns)
         prog = (i+1)/n_imgs * 100
-        if iter_cb(cell_img, prog):
-            break
     np.savetxt(os.path.join(save_dir, 'y.csv'),
         np.array(y), delimiter=',', header='y', comments='')
 
@@ -212,43 +202,94 @@ def combine_before_after(root_dir):
     df.to_csv(os.path.join(root_dir, 'y.csv'), index=False)
 
 
+# def plot_before_after(root_dir, group_labels, exclude_groups=[]):
+#     df = pd.read_csv(os.path.join(root_dir, 'y.csv'))
+#     df = df[~df.Group.isin(exclude_groups)]
+#     df_fc = df.copy()
+#     df_nm = df.copy()
+#     ref0 = df.loc[(df['Group'] == 1) & (df['Timepoint'] == 0), 'Response'].mean()
+#     ref24 = df.loc[(df['Group'] == 1) & (df['Timepoint'] == 24), 'Response'].mean()
+#     for group in df.Group.unique():
+#         ref0 = df.loc[(df['Group'] == 1) & (df['Timepoint'] == 0), 'Response'].mean()
+#         ref24 = df.loc[(df['Group'] == 1) & (df['Timepoint'] == 24), 'Response'].mean()
+#         df_nm.loc[(df_nm['Group'] == group) & (df_nm['Timepoint'] == 0), 'Response'] = df_nm.loc[(df_nm['Group'] == group) & (df_nm['Timepoint'] == 0), 'Response']/ref0
+#         df_nm.loc[(df_nm['Group'] == group) & (df_nm['Timepoint'] == 24), 'Response'] = df_nm.loc[(df_nm['Group'] == group) & (df_nm['Timepoint'] == 24), 'Response']/ref24
+#         ref = df.loc[(df['Group'] == group) & (df['Timepoint'] == 0), 'Response'].mean()
+#         df_fc.loc[(df_fc['Group'] == group) & (df_fc['Timepoint'] == 24), 'Response'] = df_fc.loc[(df_fc['Group'] == group) & (df_fc['Timepoint'] == 24), 'Response']/ref
+#     palette = ['#BBDEFB', '#1976D2']
+#     with plt.style.context(('seaborn-whitegrid', custom_styles)), sns.color_palette(palette):
+#         fig, (ax0, ax) = plt.subplots(2, 1, sharex=True, figsize=(24, 12), gridspec_kw={'height_ratios': [8, 8]})
+#         df_fc = df_fc[df_fc.Timepoint == 24]
+#         sns.stripplot(x="Group", y="Response", data=df_fc, ax=ax0, size=7, linewidth=0, dodge=True, alpha=0.8)
+#         sns.pointplot(x="Group", y="Response", data=df_fc, ax=ax0, estimator=np.mean, ci=99, join=False, dodge=0.4, markers='.', errwidth=3, capsize=0.1, scale=0.5, color='#212121')
+#         ax0.set_xlabel('')
+#         ax0.set_ylabel('Log\nFold\nChange\n' + r'$\left [\frac{\bar{y}_{24 hr}}{\bar{y}_{0 hr}}\right ]$', rotation=0, ha="right")
+#         ax0.set_yscale('log')
+#         y_min = 10**(np.floor(np.log10(df_fc['Response'].min())))
+#         y_max = 10**(np.ceil(np.log10(df_fc['Response'].max())))
+#         ylim = (y_min, y_max)
+#         ax0.set_ylim(ylim)
+#         ax0.tick_params(which='minor', length=8, width=2)
+#         ax0.tick_params(which='major', length=12, width=4)
+#         df_nm = df_nm[df_nm.Timepoint == 24]
+#         sns.stripplot(x="Group", y="Response", data=df_nm, ax=ax, size=7, linewidth=0, dodge=True, alpha=0.8)
+#         sns.pointplot(x="Group", y="Response", data=df_nm, ax=ax, estimator=np.mean, ci=99, join=False, dodge=0.4, markers='.', errwidth=3, capsize=0.1, scale=0.5, color='#212121')
+#         ax.axhline(y=1, color='#212121', linewidth=2, linestyle=(0, (5, 5)))
+#         ax.axvline(x=0.5, color='#212121', linewidth=2, linestyle=(0, (5, 5)))
+#         ax.set_xlabel('')
+#         ax.set_xticklabels(group_labels)
+#         ax.set_ylabel('Log\nFold\nDifference\n' + r'$\left [\frac{\bar{y}_{group@24hr}}{\bar{y}_{ctrl@24hr}}\right ]$', rotation=0, ha="right")
+#         ax.set_yscale('log')
+#         y_min = 10**(np.floor(np.log10(df_nm['Response'].min())))
+#         y_max = 10**(np.ceil(np.log10(df_nm['Response'].max())))
+#         ylim = (y_min, y_max)
+#         ax.set_ylim(ylim)
+#         ax.tick_params(which='minor', length=8, width=2)
+#         ax.tick_params(which='major', length=12, width=4)
+#         # handles, labels = ax.get_legend_handles_labels()
+#         # ax.legend(handles, ['t=0hr', 't=24hr'], loc='best', prop={"size": 20})
+#         fig_name = 'y_' + '-'.join([str(int(g)) for g in df.Group.unique()]) + '.png'
+#         plt.savefig(os.path.join(root_dir, fig_name), dpi=200, transparent=False, bbox_inches='tight')
+#         plt.close()
 
-def compare_before_after(root_dir):
+
+def plot_before_after(root_dir, group_labels, exclude_groups=[]):
     df = pd.read_csv(os.path.join(root_dir, 'y.csv'))
-    groups = [1, 2, 3, 4, 5, 6]
-    # groups = range(1, 13)
-    df = df.loc[df['Group'].isin(groups)]
-    t0_colnames = [0]
-    t24_colnames = [24]
-    for group in groups:
-        for t0, t24 in zip(t0_colnames, t24_colnames):
-            ref = df.loc[(df['Group'] == group) & (df['Timepoint'] == t0), 'Response'].mean()
-            df.loc[(df['Group'] == group) & (df['Timepoint'] == t0), 'Response'] = df.loc[(df['Group'] == group) & (df['Timepoint'] == t0), 'Response']/ref
-            df.loc[(df['Group'] == group) & (df['Timepoint'] == t24), 'Response'] = df.loc[(df['Group'] == group) & (df['Timepoint'] == t24), 'Response']/ref
+    df = df[~df.Group.isin(exclude_groups)]
+    df_fc = df.copy()
+    for group in df.Group.unique():
+        ref = df.loc[(df['Group'] == group) & (df['Timepoint'] == 0), 'Response'].mean()
+        df_fc.loc[(df_fc['Group'] == group) & (df_fc['Timepoint'] == 24), 'Response'] = df_fc.loc[(df_fc['Group'] == group) & (df_fc['Timepoint'] == 24), 'Response']/ref
     palette = ['#BBDEFB', '#1976D2']
     with plt.style.context(('seaborn-whitegrid', custom_styles)), sns.color_palette(palette):
-        fig, ax = plt.subplots(figsize=(24,8))
-        # ax = sns.boxplot(x="Group", y="Response", hue="Timepoint", data=df, whis=np.inf, linewidth=3, fliersize=0)
-        sns.stripplot(x="Group", y="Response", hue="Timepoint", data=df, ax=ax, size=7, linewidth=0, dodge=True, alpha=0.8)
-        sns.pointplot(x="Group", y="Response", hue="Timepoint", data=df, ax=ax, estimator=np.mean, ci=99, join=False, dodge=0.4, markers='.', errwidth=3, capsize=0.1, scale=0.5, color='#212121')
-        ax.set_xticklabels([
-            '8ZF3s-mGd\nZF3-iLIDslow\nsspBn-NLS-p65',
-            '8ZF3s-mGd\nZF3-NES-iLIDslow\nsspBn-NLS-p65',
-            '8ZF3s-mGd\nZF3-iLIDslow\nsspBn-NLS-p65\nZF3-NLS',
-            '8ZF3s-mGd\nZF3-iLIDslow\nsspBn-NLS-p65\nZF3-LANS',
-            '8ZF3s-mGd\nZF3-NLS-Zdk\np65-NLS-LOV2',
-            '8ZF3s-mGd\nZF3-NLS-Zdk\np65-NLS-LOV2\n(dark)'
-        ])
-        # ax.set_xticklabels([
-        #     '6TetO-mScI',
-        #     '6TetO-mScI\nTetR-VPR',
-        # ])
-        ax.set_xlabel('')
-        ax.set_ylabel('Fold Change')
-        # ax.set_yscale('log')
-        handles, labels = ax.get_legend_handles_labels()
-        ax.legend(handles, ['t=0hr', 't=24hr'], loc='best', prop={"size": 20})
-        fig_name = 'y_fc_' + '-'.join([str(g) for g in groups]) + '.png'
+        fig, (ax0, ax1) = plt.subplots(2, 1, sharex=True, figsize=(24, 12), gridspec_kw={'height_ratios': [8, 8]})
+        sns.stripplot(x="Group", y="Response", hue='Timepoint', data=df, ax=ax0, size=7, linewidth=0, dodge=True, alpha=0.8)
+        sns.pointplot(x="Group", y="Response", hue='Timepoint', data=df, ax=ax0, estimator=np.mean, ci=99, join=False, dodge=0.4, markers='.', errwidth=3, capsize=0.1, scale=0.5, color='#212121')
+        ax0.set_xlabel('')
+        ax0.set_ylabel('AU', rotation=0, ha="right")
+        # ax0.set_yscale('log')
+        # y_min = 10**(np.floor(np.log10(df['Response'].min())))
+        # y_max = 10**(np.ceil(np.log10(df['Response'].max())))
+        # ylim = (y_min, y_max)
+        # ax0.set_ylim(ylim)
+        ax0.tick_params(which='minor', length=8, width=2)
+        ax0.tick_params(which='major', length=12, width=4)
+        handles, labels = ax0.get_legend_handles_labels()
+        ax0.legend(handles, ['t=0hr', 't=24hr'], loc='best', prop={"size": 20})
+        df_fc = df_fc[df_fc.Timepoint == 24]
+        sns.stripplot(x="Group", y="Response", data=df_fc, ax=ax1, size=7, linewidth=0, dodge=True, alpha=0.8)
+        sns.pointplot(x="Group", y="Response", data=df_fc, ax=ax1, estimator=np.mean, ci=99, join=False, dodge=0.4, markers='.', errwidth=3, capsize=0.1, scale=0.5, color='#212121')
+        ax1.set_xlabel('')
+        ax1.set_xticklabels(group_labels)
+        ax1.set_ylabel('Fold\nChange\n' + r'$\left [\frac{\bar{y}_{24 hr}}{\bar{y}_{0 hr}}\right ]$', rotation=0, ha="right")
+        # ax1.set_yscale('log')
+        # y_min = 10**(np.floor(np.log10(df_fc['Response'].min())))
+        # y_max = 10**(np.ceil(np.log10(df_fc['Response'].max())))
+        # ylim = (y_min, y_max)
+        # ax1.set_ylim(ylim)
+        ax1.tick_params(which='minor', length=8, width=2)
+        ax1.tick_params(which='major', length=12, width=4)
+        fig_name = 'y_' + '-'.join([str(int(g)) for g in df.Group.unique()]) + '.png'
         plt.savefig(os.path.join(root_dir, fig_name), dpi=200, transparent=False, bbox_inches='tight')
         plt.close()
 
@@ -270,42 +311,48 @@ def barplot_expts(root_dir):
 
 
 if __name__ == '__main__':
-    # root_dir = '/home/phuong/data/calcium/CaM-M13/GEX/20210526_20210526_6TetO-mScl_M13-NLS-VPR_TetR-NLS-CaM/'
-    # img_ch = 'TxRed'
+    # root_dir = '/home/phuong/data/calcium/LOCCA/20210827_RGECO_LOCCA9_1/'
+    # img_ch = 'mCherry'
     # for i in natsorted(os.listdir(os.path.join(root_dir, img_ch))):
     #     save_dir = os.path.join(root_dir, img_ch + '-results', str(i))
     #     img_dir = os.path.join(root_dir, img_ch, str(i))
     #     u_csv = os.path.join(root_dir, 'u{}.csv'.format(i))
     #     mask = os.path.join(root_dir, 'mask.tif')
-    #     process_fluo_timelapse(img_dir, save_dir, u_csv='',
+    #     process_fluo_timelapse(img_dir, save_dir, u_csv=u_csv,
     #         t_unit='s', ulabel='BL', sb_microns=110, cmax=None,
-    #         segmt=False, segmt_dots=False, segmt_mask=mask, segmt_factor=2.0,
+    #         segmt=False, segmt_dots=False, segmt_mask=mask, segmt_factor=3.0,
     #         remove_small=50, fill_holes=None, clear_border=None, adj_bright=True)
 
-    # root_dir = '/home/phuong/data/ILID/ddFP/RA-16I/B3-sspBu_RA-16I_BL1-1s/mCherry-results/'
+    # root_dir = '/home/phuong/data/calcium/LOCCA/20210827_combined/'
     # combine_uy(root_dir, fold_change=True, plot_u=True)
     
-    root_dir = '/home/phuong/data/FPs/NLS/20210806_mycA6nls-mTq2/'
-    img_dir = os.path.join(root_dir, 'Default')
+    root_dir = '/home/phuong/data/FPs/Lenti/20210924/20210924_pHX-mCh-LHEK/'
+    img_dir = os.path.join(root_dir, 'DIC')
     save_dir = os.path.join(root_dir, 'results')
     process_fluo_images(img_dir, save_dir,
-        sb_microns=16, cmax=None, segmt=False, segmt_dots=False,
-        segmt_mask_dir='', segmt_factor=1.0, remove_small=50, fill_holes=None,
-        clear_border=None, quant='mean')
+        sb_microns=11, cmax=None, segmt=False, segmt_dots=False, segmt_mask='',
+        segmt_factor=0.7, remove_small=50, fill_holes=None, clear_border=None)
 
-    # root_dir = '/home/phuong/data/calcium/CaM-M13/GEX/20210526_CaM-M13/t0/'
-    # for group_dir in natsorted(os.listdir(root_dir)):
-    #     if group_dir == ".directory":
-    #         continue
-    #     print(group_dir)
-    #     img_dir = os.path.join(root_dir, group_dir, 'Default')
-    #     save_dir = os.path.join(root_dir, group_dir, 'results')
-    #     process_fluo_images(img_dir, save_dir,
-    #         sb_microns=110, cmax=None, segmt=False, segmt_dots=False,
-    #         segmt_mask_dir='', segmt_factor=1.0, remove_small=50, fill_holes=None,
-    #         clear_border=None, quant='mean')
+    # for t in ['t0', 't24']:
+    #     root_dir = '/home/phuong/data/GEX/20210911-1/{}/'.format(t)
+    #     for group_dir in natsorted(os.listdir(root_dir)):
+    #         if group_dir == ".directory":
+    #             continue
+    #         print(group_dir)
+    #         img_dir = os.path.join(root_dir, group_dir, 'YFP')
+    #         save_dir = os.path.join(root_dir, group_dir, 'results')
+    #         process_fluo_images(img_dir, save_dir,
+    #             sb_microns=110, cmax=None, segmt=False, segmt_dots=False, segmt_mask='',
+    #             segmt_factor=1.0, remove_small=50, fill_holes=None, clear_border=None)
 
-    # root_dir = '/home/phuong/data/GEX/20210731/'
+    # root_dir = '/home/phuong/data/GEX/20210911-1/'
     # combine_before_after(root_dir)
-    # compare_before_after(root_dir)
-    # barplot_expts(root_dir)
+    # group_labels = [
+    #     '0.1',
+    #     '0.5',
+    #     '1',
+    #     '5',
+    #     '10',
+    #     '35',
+    # ]
+    # plot_before_after(root_dir, group_labels, exclude_groups=[])

@@ -1,20 +1,9 @@
 import os
 import imghdr
-
-import cv2
-import numpy as np
-import seaborn as sns
-import matplotlib.pyplot as plt
 from natsort import natsorted
-from scipy.interpolate import interp1d
-from skimage import img_as_ubyte
 
 
-custom_palette = [
-    '#1976D2', '#D32F2F', '#388E3C',
-    '#7B1FA2', '#F57C00', '#C2185B',
-    '#FBC02D', '#303F9F', '#0097A7',
-    '#5D4037', '#455A64', '#AFB42B']
+custom_palette = ['#648FFF', '#785EF0', '#DC267F', '#FE6100', '#FFB000']
 
 
 custom_styles = {

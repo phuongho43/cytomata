@@ -13,12 +13,9 @@ from skimage.morphology import (remove_small_objects, remove_small_holes,
     disk, binary_erosion, binary_opening)
 from skimage.restoration import denoise_nl_means, estimate_sigma
 from skimage.segmentation import clear_border
-from skimage.exposure import is_low_contrast
 
 from cytomata.utils import setup_dirs
 
-import matplotlib.pyplot as plt
-import time
 
 def preprocess_img(imgf):
     """Subtract background and denoise fluorescence image."""
@@ -36,11 +33,9 @@ def preprocess_img(imgf):
         rfrac = 0.5
     if np.std(bkg)/np.mean(bkg) < 0.05:
         rfrac = 1
-    print(rfrac)
-    # rfrac=0.7
     tval = np.percentile(broi, rfrac*100)
     bkg[bkg >= tval] = tval
-    bkg = gaussian(bkg, 64)
+    bkg = gaussian(bkg, 64) + 0.25*sig
     bkg[bkg < 0] = 0
     img = img - bkg
     img[img < 0] = 0
