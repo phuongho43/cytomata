@@ -1,6 +1,8 @@
 import os
 import sys
+import json
 import warnings
+from collections import defaultdict
 sys.path.append(os.path.abspath('../'))
 
 import numpy as np
@@ -8,18 +10,113 @@ from tqdm import tqdm
 from imageio import mimwrite
 from skimage import img_as_float, img_as_uint
 from skimage.io import imread, imsave
+from skimage.measure import regionprops
 
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-from natsort import natsorted
+from natsort import natsorted, ns
 from scipy.interpolate import interp1d
 from matplotlib.ticker import LogLocator, NullFormatter
 import matplotlib.patches as patches
+from skimage.io import imsave
+from skimage import img_as_uint
 
+from cytomata.track import Sort, iou
 from cytomata.plot import plot_cell_img, plot_bkg_profile, plot_uy
 from cytomata.process import preprocess_img, segment_object, segment_clusters, process_u_csv
-from cytomata.utils import list_img_files, custom_styles, custom_palette
+from cytomata.utils import setup_dirs, list_img_files, custom_styles, custom_palette
+
+import time
+
+
+def count_cells(img_dir, save_dir, segmt_factor=1, remove_small=None, fill_holes=None):
+    """Count number of cells in fluorescent image."""
+    for i, imgf in enumerate(tqdm(list_img_files(img_dir))):
+        fname = os.path.splitext(os.path.basename(imgf))[0]
+        img, raw, bkg, den = preprocess_img(imgf)
+        cmax_i = np.percentile(img, 100)
+        plot_bkg_profile(fname, save_dir, raw, bkg)
+        thr, reg, n = segment_object(den, factor=segmt_factor, rs=remove_small, fh=fill_holes)
+        print(n)
+        img_path = os.path.join(save_dir, fname + '.tif')
+        # with warnings.catch_warnings():
+        #     warnings.simplefilter("ignore")
+        #     imsave(img_path, img_as_uint(img))
+        img_save_dir = os.path.join(save_dir, 'den')
+        cell_den = plot_cell_img(den, thr, fname, img_save_dir, cmax=cmax_i)
+
+
+def process_US_timelapse(img_dir, save_dir, t_unit='s', sb_microns=None,
+    cmax=None, segmt_factor=1, remove_small=None, fill_holes=None, adj_bright=False):
+    """Analyze fluorescence timelapse images and generate figures."""
+    # setup_dirs(os.path.join(save_dir, 'tracks'))
+    setup_dirs(os.path.join(save_dir, 'subtracted'))
+    factor = segmt_factor
+    tracker = Sort(max_age=3, min_hits=1)
+    t = [float(os.path.splitext(os.path.basename(imgf))[0]) for imgf in list_img_files(img_dir)]
+    df = pd.DataFrame(index=t, columns=['id', 'time', 'mean_int', 'b_box'])
+    imgs = []
+    for i, imgf in enumerate(tqdm(list_img_files(img_dir))):
+        fname = os.path.splitext(os.path.basename(imgf))[0]
+        ti = float(fname)
+        img, raw, bkg, den = preprocess_img(imgf)
+        cmax_i = cmax
+        if cmax is None:
+            cmax_i = np.percentile(img, 99.99)
+        plot_bkg_profile(fname, save_dir, raw, bkg)
+        if adj_bright:
+            a_reg = img[img > 0]
+            if i == 0:
+                kval = np.mean(a_reg[a_reg > np.percentile(a_reg, 95)])
+            segmt_factor = factor * (kval/np.mean(a_reg[a_reg > np.percentile(a_reg, 95)]))
+        thr, reg = segment_object(den, factor=segmt_factor, rs=remove_small, fh=fill_holes)
+        ints = np.array([prop.mean_intensity for prop in regionprops(reg, img)])
+        dets = np.array([prop.bbox for prop in regionprops(reg)])
+        trks = tracker.update(dets)
+        for trk in trks:  # Restructure data trajectory-wise
+            id = int(trk[4])
+            idx = np.argmax(np.array([iou(det, trk) for det in dets]))
+            mi = float(ints[idx])
+            bb = [float(det) for det in dets[idx]]
+            data_row = {'id': id, 'time': ti, 'mean_int': mi, 'b_box': bb}
+            df = df.append(data_row, ignore_index=True)
+        img_path = os.path.join(save_dir, 'subtracted', fname + '.tiff')
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            imsave(img_path, img_as_uint(img))
+        img_save_dir = os.path.join(save_dir, 'denoised')
+        cell_den = plot_cell_img(den, None, fname, img_save_dir,
+                cmax=cmax_i, t_unit=t_unit, sb_microns=sb_microns)
+        img_save_dir = os.path.join(save_dir, 'outlined')
+        cell_den = plot_cell_img(den, thr, fname, img_save_dir,
+                cmax=cmax_i, t_unit=t_unit, sb_microns=sb_microns)
+        imgs.append(cell_den)
+    df.dropna(how='all', inplace=True)
+    df.to_csv(os.path.join(save_dir, 'y.csv'), index=False)
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        mimwrite(os.path.join(save_dir, 'cell.gif'), imgs, fps=len(imgs)//10)
+
+
+def plot_sc_tracks(root_dir, min_trk_len=150, figsize=(16, 8)):
+    df = pd.read_csv(os.path.join(root_dir, 'y.csv'))
+    df.dropna(how='any', inplace=True)
+    df.reset_index(drop=True, inplace=True)
+    value_counts = df['id'].value_counts()
+    keep = value_counts[value_counts >= min_trk_len].index.tolist()
+    df = df[df['id'].isin(keep)]
+    with plt.style.context(('seaborn-whitegrid', custom_styles)), sns.color_palette(custom_palette):
+        fig, ax = plt.subplots(figsize=figsize)
+        # for idi in df['id'].unique():
+        #     df_i = df.loc[(df['id'] == idi), ('time', 'mean_int')]
+        sns.lineplot(data=df[['id', 'time', 'mean_int']], x='time', y='mean_int', hue='id', lw=2, palette=sns.color_palette("Blues", as_cmap=True))
+        ax.set_xlabel('Time')
+        ax.set_ylabel('AU')
+        ax.get_legend().remove()
+        fig_name = 'tracks.png'
+        plt.savefig(os.path.join(save_dir, fig_name), dpi=200, transparent=False, bbox_inches='tight')
+        plt.close()
 
 
 def process_fluo_timelapse(img_dir, save_dir, u_csv=None,
@@ -69,10 +166,10 @@ def process_fluo_timelapse(img_dir, save_dir, u_csv=None,
                 yi = 0
         y.append(yi)
         sig_ann = round(float(fname), 1) in t_ann_img
-        cell_img = plot_cell_img(den, thr, fname, save_dir,
+        img_save_dir = os.path.join(save_dir, 'final')
+        cell_img = plot_cell_img(den, thr, fname, img_save_dir,
             cmax, sig_ann, t_unit=t_unit, sb_microns=sb_microns)
         imgs.append(cell_img)
-        prog = (i+1)/n_imgs * 100
     plot_uy(t, y, tu, u, save_dir, t_unit=t_unit, ulabel=ulabel)
     data = np.column_stack((t, y))
     np.savetxt(os.path.join(save_dir, 'y.csv'),
@@ -150,8 +247,8 @@ def process_fluo_images(img_dir, save_dir,
     segmt_mask='', segmt_factor=1, remove_small=None,
     fill_holes=None, clear_border=None):
     """Analyze fluorescence 10x images and generate figures."""
-    if cmax is None:
-        cmax = np.max([np.percentile(img_as_float(imread(imgf)), 99.999) for imgf in list_img_files(img_dir)])
+    # if cmax is None:
+    #     cmax_i = np.max([np.percentile(img_as_float(imread(imgf)), 99.999) for imgf in list_img_files(img_dir)])
     n_imgs = len(list_img_files(img_dir))
     y = []
     imgs = []
@@ -159,7 +256,9 @@ def process_fluo_images(img_dir, save_dir,
         # fname = os.path.splitext(os.path.basename(imgf))[0]
         fname = str(i)
         img, raw, bkg, den = preprocess_img(imgf)
-        cmax = np.percentile(img, 99.999)
+        cmax_i = cmax
+        if cmax is None:
+            cmax_i = np.percentile(img, 99.999)
         plot_bkg_profile(fname, save_dir, raw, bkg)
         thr = None
         yi = np.mean(img)
@@ -180,9 +279,9 @@ def process_fluo_images(img_dir, save_dir,
             if np.isnan(yi):
                 yi = 0
         y.append(yi)
-        cell_img = plot_cell_img(den, thr, fname, save_dir,
-            cmax, sig_ann=False, t_unit=None, sb_microns=sb_microns)
-        prog = (i+1)/n_imgs * 100
+        img_save_dir = os.path.join(save_dir, 'final')
+        cell_img = plot_cell_img(den, thr, fname, img_save_dir,
+            cmax_i, sig_ann=False, t_unit=None, sb_microns=sb_microns)
     np.savetxt(os.path.join(save_dir, 'y.csv'),
         np.array(y), delimiter=',', header='y', comments='')
 
@@ -197,6 +296,7 @@ def combine_before_after(root_dir):
             rs = y_data['y'].values
             gr = np.full_like(rs, i+1)
             tp = np.full_like(rs, tpoint)
+            print(data_dir, gr, rs)
             di = pd.DataFrame(np.column_stack([gr, tp, rs]), columns=['Group', 'Timepoint', 'Response'])
             df = df.append(di, ignore_index=True)
     df.to_csv(os.path.join(root_dir, 'y.csv'), index=False)
@@ -253,64 +353,130 @@ def combine_before_after(root_dir):
 #         plt.close()
 
 
-def plot_before_after(root_dir, group_labels, exclude_groups=[]):
+# def plot_before_after(root_dir, group_labels, exclude_groups=[]):
+#     df = pd.read_csv(os.path.join(root_dir, 'y.csv'))
+#     df = df[~df.Group.isin(exclude_groups)]
+#     df_fc = df.copy()
+#     for group in df.Group.unique():
+#         ref = df.loc[(df['Group'] == group) & (df['Timepoint'] == 0), 'Response'].mean()
+#         df_fc.loc[(df_fc['Group'] == group) & (df_fc['Timepoint'] == 24), 'Response'] = df_fc.loc[(df_fc['Group'] == group) & (df_fc['Timepoint'] == 24), 'Response']/ref
+#     palette = ['#BBDEFB', '#1976D2']
+#     with plt.style.context(('seaborn-whitegrid', custom_styles)), sns.color_palette(palette):
+#         fig, (ax0, ax1) = plt.subplots(2, 1, sharex=True, figsize=(24, 12), gridspec_kw={'height_ratios': [8, 8]})
+#         sns.stripplot(x="Group", y="Response", hue='Timepoint', data=df, ax=ax0, size=7, linewidth=0, dodge=True, alpha=0.8)
+#         sns.pointplot(x="Group", y="Response", hue='Timepoint', data=df, ax=ax0, estimator=np.mean, ci=99, join=False, dodge=0.4, markers='.', errwidth=3, capsize=0.1, scale=0.5, color='#212121')
+#         ax0.set_xlabel('')
+#         ax0.set_ylabel('AU', rotation=0, ha="right")
+#         # ax0.set_yscale('log')
+#         # y_min = 10**(np.floor(np.log10(df['Response'].min())))
+#         # y_max = 10**(np.ceil(np.log10(df['Response'].max())))
+#         # ylim = (y_min, y_max)
+#         # ax0.set_ylim(ylim)
+#         ax0.tick_params(which='minor', length=8, width=2)
+#         ax0.tick_params(which='major', length=12, width=4)
+#         handles, labels = ax0.get_legend_handles_labels()
+#         ax0.legend(handles, ['t=0hr', 't=24hr'], loc='best', prop={"size": 20})
+#         df_fc = df_fc[df_fc.Timepoint == 24]
+#         sns.stripplot(x="Group", y="Response", data=df_fc, ax=ax1, size=7, linewidth=0, dodge=True, alpha=0.8)
+#         sns.pointplot(x="Group", y="Response", data=df_fc, ax=ax1, estimator=np.mean, ci=99, join=False, dodge=0.4, markers='.', errwidth=3, capsize=0.1, scale=0.5, color='#212121')
+#         ax1.set_xlabel('')
+#         ax1.set_xticklabels(group_labels)
+#         ax1.set_ylabel('Fold\nChange\n' + r'$\left [\frac{\bar{y}_{24 hr}}{\bar{y}_{0 hr}}\right ]$', rotation=0, ha="right")
+#         # ax1.set_yscale('log')
+#         # y_min = 10**(np.floor(np.log10(df_fc['Response'].min())))
+#         # y_max = 10**(np.ceil(np.log10(df_fc['Response'].max())))
+#         # ylim = (y_min, y_max)
+#         # ax1.set_ylim(ylim)
+#         ax1.tick_params(which='minor', length=8, width=2)
+#         ax1.tick_params(which='major', length=12, width=4)
+#         fig_name = 'y_' + '-'.join([str(int(g)) for g in df.Group.unique()]) + '.png'
+#         plt.savefig(os.path.join(root_dir, fig_name), dpi=200, transparent=False, bbox_inches='tight')
+#         plt.close()
+
+
+def plot_before_after(root_dir, group_labels, group_order, figsize=(24, 8)):
     df = pd.read_csv(os.path.join(root_dir, 'y.csv'))
-    df = df[~df.Group.isin(exclude_groups)]
+    df = df[df.Group.isin(group_order)]
     df_fc = df.copy()
-    for group in df.Group.unique():
-        ref = df.loc[(df['Group'] == group) & (df['Timepoint'] == 0), 'Response'].mean()
-        df_fc.loc[(df_fc['Group'] == group) & (df_fc['Timepoint'] == 24), 'Response'] = df_fc.loc[(df_fc['Group'] == group) & (df_fc['Timepoint'] == 24), 'Response']/ref
-    palette = ['#BBDEFB', '#1976D2']
+    fc_vals = {}
+    for gr in df.Group.unique():
+        mean_t0 = df.loc[(df['Group'] == gr) & (df['Timepoint'] == 0), 'Response'].mean()
+        mean_t24 = df.loc[(df['Group'] == gr) & (df['Timepoint'] == 24), 'Response'].mean()
+        fc_vals[gr] = str(round(mean_t24/mean_t0, 2)) + r'$\times$'
+    palette = ['#B0BEC5', '#1976D2']
     with plt.style.context(('seaborn-whitegrid', custom_styles)), sns.color_palette(palette):
-        fig, (ax0, ax1) = plt.subplots(2, 1, sharex=True, figsize=(24, 12), gridspec_kw={'height_ratios': [8, 8]})
-        sns.stripplot(x="Group", y="Response", hue='Timepoint', data=df, ax=ax0, size=7, linewidth=0, dodge=True, alpha=0.8)
-        sns.pointplot(x="Group", y="Response", hue='Timepoint', data=df, ax=ax0, estimator=np.mean, ci=99, join=False, dodge=0.4, markers='.', errwidth=3, capsize=0.1, scale=0.5, color='#212121')
-        ax0.set_xlabel('')
-        ax0.set_ylabel('AU', rotation=0, ha="right")
-        # ax0.set_yscale('log')
-        # y_min = 10**(np.floor(np.log10(df['Response'].min())))
-        # y_max = 10**(np.ceil(np.log10(df['Response'].max())))
-        # ylim = (y_min, y_max)
-        # ax0.set_ylim(ylim)
-        ax0.tick_params(which='minor', length=8, width=2)
-        ax0.tick_params(which='major', length=12, width=4)
-        handles, labels = ax0.get_legend_handles_labels()
-        ax0.legend(handles, ['t=0hr', 't=24hr'], loc='best', prop={"size": 20})
-        df_fc = df_fc[df_fc.Timepoint == 24]
-        sns.stripplot(x="Group", y="Response", data=df_fc, ax=ax1, size=7, linewidth=0, dodge=True, alpha=0.8)
-        sns.pointplot(x="Group", y="Response", data=df_fc, ax=ax1, estimator=np.mean, ci=99, join=False, dodge=0.4, markers='.', errwidth=3, capsize=0.1, scale=0.5, color='#212121')
-        ax1.set_xlabel('')
-        ax1.set_xticklabels(group_labels)
-        ax1.set_ylabel('Fold\nChange\n' + r'$\left [\frac{\bar{y}_{24 hr}}{\bar{y}_{0 hr}}\right ]$', rotation=0, ha="right")
-        # ax1.set_yscale('log')
-        # y_min = 10**(np.floor(np.log10(df_fc['Response'].min())))
-        # y_max = 10**(np.ceil(np.log10(df_fc['Response'].max())))
-        # ylim = (y_min, y_max)
-        # ax1.set_ylim(ylim)
-        ax1.tick_params(which='minor', length=8, width=2)
-        ax1.tick_params(which='major', length=12, width=4)
+        fig, ax = plt.subplots(figsize=figsize)
+        sns.stripplot(x="Group", y="Response", hue='Timepoint', data=df, order=group_order, ax=ax, size=7, linewidth=0, dodge=True, alpha=0.8)
+        sns.pointplot(x="Group", y="Response", hue='Timepoint', data=df, order=group_order, ax=ax, estimator=np.mean, ci=99, join=False, dodge=0.4, markers='.', errwidth=3, capsize=0.1, scale=0.5, color='#212121')
+        for i, gr in enumerate(group_order):
+            y = df.loc[(df['Group'] == gr), 'Response'].max()
+            m = df.Response.max() * 0.05
+            ax.plot([i-0.2, i-0.2, i+0.2, i+0.2], [y+m, y+m*1.5, y+m*1.5, y+m], lw=3, color='#212121')
+            ax.text(i, y+m*2, fc_vals[gr], ha='center', va='bottom', color='#212121', fontsize=20)
+        ax.set_xlabel('')
+        ax.set_ylabel('AU')
+        ax.set_xticklabels(group_labels)
+        ax.tick_params(which='minor', length=8, width=2)
+        ax.tick_params(which='major', length=12, width=4)
+        handles, labels = ax.get_legend_handles_labels()
+        ax.legend(handles, ['t=0hr', 't=24hr'], loc='best', prop={"size": 20}, frameon=True, shadow=False)
         fig_name = 'y_' + '-'.join([str(int(g)) for g in df.Group.unique()]) + '.png'
         plt.savefig(os.path.join(root_dir, fig_name), dpi=200, transparent=False, bbox_inches='tight')
         plt.close()
 
 
-def barplot_expts(root_dir):
-    y_data = pd.read_csv(os.path.join(root_dir, 'y.csv'))
+def combine_groups(root_dir, ch):
+    df = pd.DataFrame(columns=['Group', 'Response'])
+    for i, data_dir in enumerate(natsorted([x[1] for x in os.walk(root_dir)][0], alg=ns.IGNORECASE)):
+        print(data_dir)
+        y_csv = os.path.join(root_dir, data_dir, ch + '-results', 'y.csv')
+        y_data = pd.read_csv(y_csv)
+        rs = y_data['y'].values
+        gr = np.full_like(rs, i+1)
+        di = pd.DataFrame(np.column_stack([gr, rs]), columns=['Group', 'Response'])
+        df = df.append(di, ignore_index=True)
+    df.to_csv(os.path.join(root_dir, 'y.csv'), index=False)
+
+
+def plot_groups(root_dir, group_labels, group_order, figsize=(16, 8)):
+    df = pd.read_csv(os.path.join(root_dir, 'y.csv'))
+    df = df[df.Group.isin(group_order)]
     with plt.style.context(('seaborn-whitegrid', custom_styles)), sns.color_palette(custom_palette):
-        fig, ax = plt.subplots(figsize=(12,8))
-        ax = sns.boxplot(x="System", y="Response", data=y_data, whis=np.inf, linewidth=3, fliersize=0)
-        g = sns.stripplot(x="System", y="Response", data=y_data, ax=ax, size=10, linewidth=1, dodge=True)
-        # ax.set_yscale("log")
-        # g.ax.set_xticks([-0.2, 1.2])
-        # plt.legend(loc='upper center', prop={"size": 20})
-        ax.set_xticklabels(["ZF3-p65", "ZF3-p65\n+ZF3"])
-        ax.set_ylabel('Ave Fl.')
+        fig, ax = plt.subplots(figsize=figsize)
+        sns.stripplot(x="Group", y="Response", data=df, order=group_order, ax=ax, size=7, linewidth=0, dodge=True, alpha=0.8)
+        sns.pointplot(x="Group", y="Response", data=df, order=group_order, ax=ax, estimator=np.mean, ci=99, join=False, dodge=0.4, markers='.', errwidth=3, capsize=0.1, scale=0.5, color='#212121')
         ax.set_xlabel('')
-        plt.savefig(os.path.join(root_dir, 'y.png'), dpi=200, transparent=False, bbox_inches='tight')
+        ax.set_xticklabels(group_labels)
+        ax.set_ylabel('AU')
+        ax.tick_params(which='minor', length=8, width=2)
+        ax.tick_params(which='major', length=12, width=4)
+        fig_name = 'y_' + '-'.join([str(int(g)) for g in df.Group.unique()]) + '.png'
+        plt.savefig(os.path.join(root_dir, fig_name), dpi=200, transparent=False, bbox_inches='tight')
+        plt.close()
+
+def plot_lines(root_dir):
+    df = pd.read_csv(os.path.join(root_dir, 'y.csv'))
+    with plt.style.context(('seaborn-whitegrid', custom_styles)), sns.color_palette(custom_palette):
+        fig, ax = plt.subplots(figsize=(20, 8))
+        g = sns.lineplot(data=df, x="t", y="y", hue="h", estimator=np.mean, err_style="band", ci=68)
+        g.legend_.set_title(None)
+        ax.set_xlabel('Pulse Period')
+        ax.set_ylabel('Fold Change in N/C Ratio')
+        ax.set_xticks([2, 5, 10, 15, 30])
+        # ax.tick_params(which='minor', length=8, width=2)
+        # ax.tick_params(which='major', length=12, width=4)
+        fig_name = 'y.png'
+        plt.savefig(os.path.join(root_dir, fig_name), dpi=200, transparent=False, bbox_inches='tight')
         plt.close()
 
 
 if __name__ == '__main__':
+    # root_dir = '/home/phuong/data/cell_count/'
+    # img_dir = os.path.join(root_dir, 'imgs')
+    # save_dir = os.path.join(root_dir, 'results')
+    # count_cells(img_dir, save_dir, segmt_factor=3.5, remove_small=20, fill_holes=5)
+
+
     # root_dir = '/home/phuong/data/calcium/LOCCA/20210827_RGECO_LOCCA9_1/'
     # img_ch = 'mCherry'
     # for i in natsorted(os.listdir(os.path.join(root_dir, img_ch))):
@@ -326,33 +492,50 @@ if __name__ == '__main__':
     # root_dir = '/home/phuong/data/calcium/LOCCA/20210827_combined/'
     # combine_uy(root_dir, fold_change=True, plot_u=True)
     
-    root_dir = '/home/phuong/data/FPs/Lenti/20210924/20210924_pHX-mCh-LHEK/'
-    img_dir = os.path.join(root_dir, 'DIC')
-    save_dir = os.path.join(root_dir, 'results')
-    process_fluo_images(img_dir, save_dir,
-        sb_microns=11, cmax=None, segmt=False, segmt_dots=False, segmt_mask='',
-        segmt_factor=0.7, remove_small=50, fill_holes=None, clear_border=None)
+    root_dir = '/home/phuong/data/01_2MHz_200mV_20p_500ms/'
+    channel = 'imgs'
+    img_dir = os.path.join(root_dir, channel)
+    save_dir = os.path.join(root_dir, channel + '-results')
+    process_US_timelapse(img_dir, save_dir, t_unit=None, sb_microns=110,
+        cmax=1.5, segmt_factor=3, remove_small=25, fill_holes=100, adj_bright=True)
+    plot_sc_tracks(save_dir, min_trk_len=100, figsize=(16, 8))
+    # process_fluo_images(img_dir, save_dir,
+    #     sb_microns=None, cmax=None, segmt=True, segmt_dots=False, segmt_mask='',
+    #     segmt_factor=4.0, remove_small=25, fill_holes=None, clear_border=None)
+
+    # root_dir = '/home/phuong/data/GEX/20211210/'
+    # ch = 'Default'
+    # group_labels = [
+    #     '10TAbs_mScI\nTAbd-VP64-NLS',
+    #     '10TAbs_mScI\nTAbd-VP64-NES',
+    # ]
+    # combine_groups(root_dir, ch)
+    # plot_groups(root_dir, group_labels, group_order=[2, 3], figsize=(len(group_labels)*6, 8))
+
 
     # for t in ['t0', 't24']:
-    #     root_dir = '/home/phuong/data/GEX/20210911-1/{}/'.format(t)
+    #     root_dir = '/home/phuong/data/GEX/20220121/{}/'.format(t)
     #     for group_dir in natsorted(os.listdir(root_dir)):
     #         if group_dir == ".directory":
     #             continue
     #         print(group_dir)
-    #         img_dir = os.path.join(root_dir, group_dir, 'YFP')
+    #         img_dir = os.path.join(root_dir, group_dir, 'Default')
     #         save_dir = os.path.join(root_dir, group_dir, 'results')
     #         process_fluo_images(img_dir, save_dir,
-    #             sb_microns=110, cmax=None, segmt=False, segmt_dots=False, segmt_mask='',
-    #             segmt_factor=1.0, remove_small=50, fill_holes=None, clear_border=None)
+    #             sb_microns=160, cmax=None, segmt=False, segmt_dots=False, segmt_mask=None,
+    #             segmt_factor=1, remove_small=50, fill_holes=None, clear_border=None)
 
-    # root_dir = '/home/phuong/data/GEX/20210911-1/'
+
+    # root_dir = '/home/phuong/data/GEX/20220121/'
     # combine_before_after(root_dir)
     # group_labels = [
-    #     '0.1',
-    #     '0.5',
-    #     '1',
-    #     '5',
-    #     '10',
-    #     '35',
+    #     '6TetO\n+iLIDsl',
+    #     '6TetO\n+iLIDsl\n+TetR-NLS',
+    #     '6ZF3s-2TetO\n+iLIDsl',
+    #     '6ZF3s-2TetO\n+iLIDsl\n+TetR-NLS'
     # ]
-    # plot_before_after(root_dir, group_labels, exclude_groups=[])
+    # plot_before_after(root_dir, group_labels, group_order=[1, 2, 3, 4], figsize=(len(group_labels)*6, 8))
+
+
+    # root_dir = '/home/phuong/data/'
+    # plot_lines(root_dir)

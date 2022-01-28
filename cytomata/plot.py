@@ -14,7 +14,7 @@ from cytomata.utils import setup_dirs, custom_styles, custom_palette
 
 
 def plot_cell_img(img, thr, fname, save_dir, cmax, sig_ann=False, t_unit=None, sb_microns=None):
-    setup_dirs(os.path.join(save_dir, 'imgs'))
+    setup_dirs(save_dir)
     with plt.style.context(('seaborn-whitegrid', custom_styles)), sns.color_palette(custom_palette):
         fig, ax = plt.subplots(figsize=(10,8))
         axim = ax.imshow(img, cmap='turbo')
@@ -41,9 +41,9 @@ def plot_cell_img(img, thr, fname, save_dir, cmax, sig_ann=False, t_unit=None, s
         if thr is not None:
             with warnings.catch_warnings():
                 warnings.simplefilter('ignore')
-                ax.contour(thr, linewidths=0.3, colors='w')
+                ax.contour(thr, linewidths=0.3, colors='r')
         fig.canvas.draw()
-        fig.savefig(os.path.join(save_dir, 'imgs', fname + '.png'),
+        fig.savefig(os.path.join(save_dir, fname + '.png'),
             dpi=100, bbox_inches='tight', pad_inches=0)
         cell_img = img_as_ubyte(np.array(fig.canvas.renderer._renderer))
         plt.close(fig)
@@ -51,7 +51,7 @@ def plot_cell_img(img, thr, fname, save_dir, cmax, sig_ann=False, t_unit=None, s
 
 
 def plot_bkg_profile(fname, save_dir, img, bkg):
-    setup_dirs(os.path.join(save_dir, 'bg_sub'))
+    setup_dirs(os.path.join(save_dir, 'debug'))
     with plt.style.context(('seaborn-whitegrid', custom_styles)), sns.color_palette(custom_palette):
         bg_rows = np.argsort(np.var(img, axis=1))[-100:-1:10]
         row_i = np.random.choice(bg_rows.shape[0])
@@ -60,7 +60,7 @@ def plot_bkg_profile(fname, save_dir, img, bkg):
         ax.plot(img[bg_row, :])
         ax.plot(bkg[bg_row, :])
         ax.set_title(str(bg_row))
-        bg_path = os.path.join(save_dir, 'bg_sub', '{}.png'.format(fname))
+        bg_path = os.path.join(save_dir, 'debug', '{}.png'.format(fname))
         fig.savefig(bg_path, bbox_inches='tight', transparent=False, dpi=100)
         plt.close(fig)
 
