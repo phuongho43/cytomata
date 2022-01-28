@@ -41,7 +41,7 @@ def plot_cell_img(img, thr, fname, save_dir, cmax, sig_ann=False, t_unit=None, s
         if thr is not None:
             with warnings.catch_warnings():
                 warnings.simplefilter('ignore')
-                ax.contour(thr, linewidths=0.3, colors='r')
+                ax.contour(thr, linewidths=0.1, colors='w')
         fig.canvas.draw()
         fig.savefig(os.path.join(save_dir, fname + '.png'),
             dpi=100, bbox_inches='tight', pad_inches=0)

@@ -20,6 +20,7 @@ from scipy.interpolate import interp1d
 from matplotlib.ticker import LogLocator, NullFormatter
 import matplotlib.patches as patches
 from skimage.io import imsave
+from skimage.exposure import rescale_intensity
 from skimage import img_as_uint
 
 from cytomata.track import Sort, iou
@@ -55,8 +56,8 @@ def process_US_timelapse(img_dir, save_dir, t_unit='s', sb_microns=None,
     factor = segmt_factor
     tracker = Sort(max_age=3, min_hits=1)
     t = [float(os.path.splitext(os.path.basename(imgf))[0]) for imgf in list_img_files(img_dir)]
-    df = pd.DataFrame(index=t, columns=['id', 'time', 'mean_int', 'b_box'])
     imgs = []
+    data = []
     for i, imgf in enumerate(tqdm(list_img_files(img_dir))):
         fname = os.path.splitext(os.path.basename(imgf))[0]
         ti = float(fname)
@@ -70,7 +71,7 @@ def process_US_timelapse(img_dir, save_dir, t_unit='s', sb_microns=None,
             if i == 0:
                 kval = np.mean(a_reg[a_reg > np.percentile(a_reg, 95)])
             segmt_factor = factor * (kval/np.mean(a_reg[a_reg > np.percentile(a_reg, 95)]))
-        thr, reg = segment_object(den, factor=segmt_factor, rs=remove_small, fh=fill_holes)
+        thr, reg, n = segment_object(den, factor=segmt_factor, rs=remove_small, fh=fill_holes)
         ints = np.array([prop.mean_intensity for prop in regionprops(reg, img)])
         dets = np.array([prop.bbox for prop in regionprops(reg)])
         trks = tracker.update(dets)
@@ -80,11 +81,11 @@ def process_US_timelapse(img_dir, save_dir, t_unit='s', sb_microns=None,
             mi = float(ints[idx])
             bb = [float(det) for det in dets[idx]]
             data_row = {'id': id, 'time': ti, 'mean_int': mi, 'b_box': bb}
-            df = df.append(data_row, ignore_index=True)
+            data.append(data_row)
         img_path = os.path.join(save_dir, 'subtracted', fname + '.tiff')
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            imsave(img_path, img_as_uint(img))
+            imsave(img_path, img_as_uint(rescale_intensity(img)))
         img_save_dir = os.path.join(save_dir, 'denoised')
         cell_den = plot_cell_img(den, None, fname, img_save_dir,
                 cmax=cmax_i, t_unit=t_unit, sb_microns=sb_microns)
@@ -92,6 +93,7 @@ def process_US_timelapse(img_dir, save_dir, t_unit='s', sb_microns=None,
         cell_den = plot_cell_img(den, thr, fname, img_save_dir,
                 cmax=cmax_i, t_unit=t_unit, sb_microns=sb_microns)
         imgs.append(cell_den)
+    df = pd.DataFrame(data, index=t, columns=['id', 'time', 'mean_int', 'b_box'])
     df.dropna(how='all', inplace=True)
     df.to_csv(os.path.join(save_dir, 'y.csv'), index=False)
     with warnings.catch_warnings():
@@ -497,7 +499,7 @@ if __name__ == '__main__':
     img_dir = os.path.join(root_dir, channel)
     save_dir = os.path.join(root_dir, channel + '-results')
     process_US_timelapse(img_dir, save_dir, t_unit=None, sb_microns=110,
-        cmax=1.5, segmt_factor=3, remove_small=25, fill_holes=100, adj_bright=True)
+        cmax=1.25, segmt_factor=3, remove_small=25, fill_holes=100, adj_bright=True)
     plot_sc_tracks(save_dir, min_trk_len=100, figsize=(16, 8))
     # process_fluo_images(img_dir, save_dir,
     #     sb_microns=None, cmax=None, segmt=True, segmt_dots=False, segmt_mask='',

@@ -24,15 +24,13 @@ def preprocess_img(imgf):
     img = img_as_float(imread(imgf))
     raw = img.copy()
     sig = estimate_sigma(img)
-    den = denoise_nl_means(img, h=sig, sigma=sig, patch_size=5, patch_distance=7)
+    den = denoise_nl_means(img, h=sig, sigma=sig, patch_size=5, patch_distance=5)
     raw = den.copy()
     bkg = den.copy()
     thr = threshold_local(bkg, block_size=7, param=64)
     thr = bkg < thr
     broi = bkg*thr
-    # rfrac = np.percentile(den, 25)/np.percentile(den, 75)
     rfrac = 1 - np.var(bkg)/np.mean(bkg)
-    print(rfrac)
     if rfrac < 0.5:
         rfrac = 0.5
     elif rfrac > 1.0:
@@ -43,7 +41,6 @@ def preprocess_img(imgf):
     bkg[bkg < 0] = 0
     img = (img - bkg) / bkg
     img[img < 0] = 0
-    # img[img > 1] = 1
     den = (den - bkg) / bkg
     den[den < 0] = 0
     return img, raw, bkg, den
@@ -57,7 +54,6 @@ def segment_object(img, factor=1, rs=None, fh=None, cb=None):
     thv_ots = threshold_otsu(img) / 3
     thv_yen = threshold_yen(img) / 3
     thv_li = threshold_li(img)
-    print([thv_ots, thv_yen, thv_li])
     thv = np.median([thv_ots, thv_yen, thv_li]) * factor
     thr = img > thv
     if rs is not None:
