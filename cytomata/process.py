@@ -44,14 +44,16 @@ def preprocess_img(imgf):
     return img, raw, bkg, den
 
 
-def segment_object(img, factor=1, rs=None):
+def segment_object(img, segmt_local=False, factor=1, rs=None):
     """Segment out bright objects from fluorescence image."""
     if not np.any(img):
         thr = img.astype(bool)
         reg, n = None, 0
         return thr, reg, n
-    thv = threshold_local(img, block_size=5, param=24) * factor
-    # thv = threshold_li(img) * factor
+    if segmt_local:
+        thv = threshold_local(img, block_size=5, param=24) * factor
+    else:
+        thv = threshold_li(img) * factor
     thr = img > thv
     if rs is not None:
         thr = remove_small_objects(ndi.label(thr)[0].astype(bool), min_size=rs)

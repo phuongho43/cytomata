@@ -28,17 +28,13 @@ from cytomata.process import preprocess_img, segment_object, segment_clusters, p
 from cytomata.utils import setup_dirs, list_img_files, custom_styles, custom_palette
 
 
-def process_fluo_images(img_dir, save_dir,
-    sb_microns=11, cmax=None, segmt=False, segmt_factor=1, remove_small=None):
+def process_fluo_images(img_dir, save_dir, sb_microns=11, cmax_all=True,
+    segmt=False, segmt_local=False, segmt_factor=1, remove_small=None):
     """Analyze fluorescence 10x images and generate figures."""
-    # i_max = np.argmax([np.percentile(img_as_float(imread(imgf)), 99.9) for imgf in list_img_files(img_dir)])
-    # img, raw, bkg, den = preprocess_img(list_img_files(img_dir)[i_max])
-    # cmax_i = np.percentile(img, 99.99)
     def img_task(data, i, imgf):
         fname = str(i)
         img, raw, bkg, den = preprocess_img(imgf)
-        cmax_i = cmax
-        if cmax is None:
+        if not cmax_all:
             cmax_i = np.percentile(img, 99.99)
         plot_bkg_profile(fname, save_dir, raw, bkg)
         thr = None
@@ -49,10 +45,9 @@ def process_fluo_images(img_dir, save_dir,
             warnings.simplefilter("ignore")
             imsave(img_path, img_as_uint(rescale_intensity(img)))
         img_save_dir = os.path.join(save_dir, 'denoised')
-        cell_den = plot_cell_img(den, None, fname, img_save_dir,
-            cmax=cmax_i, sb_microns=sb_microns)
+        cell_den = plot_cell_img(den, None, fname, img_save_dir, cmax=cmax_i, sb_microns=sb_microns)
         if segmt:
-            thr, reg, n = segment_object(den, factor=segmt_factor, rs=remove_small)
+            thr, reg, n = segment_object(den, segmt_local=segmt_local, factor=segmt_factor, rs=remove_small)
             img_save_dir = os.path.join(save_dir, 'outlined')
             cell_den = plot_cell_img(den, thr, fname, img_save_dir, cmax=cmax_i, sb_microns=sb_microns)
             mi = np.mean(img[thr])
@@ -60,6 +55,10 @@ def process_fluo_images(img_dir, save_dir,
         return data
     setup_dirs(os.path.join(save_dir, 'subtracted'))
     ta = time.time()
+    if cmax_all:
+        i_max = np.argmax([np.percentile(img_as_float(imread(imgf)), 99.9) for imgf in list_img_files(img_dir)])
+        img, raw, bkg, den = preprocess_img(list_img_files(img_dir)[i_max])
+        cmax_i = np.percentile(img, 99.99)
     data = []
     # for i, imgf in enumerate(list_img_files(img_dir)):
     #     data = img_task(data, i, imgf)
@@ -94,12 +93,13 @@ def combine_before_after(root_dir):
         for i, data_dir in enumerate(natsorted([x[1] for x in os.walk(tp_dir)][0])):
             y_csv = os.path.join(tp_dir, data_dir, 'results', 'y.csv')
             y_data = pd.read_csv(y_csv)
-            rs = y_data['y'].values
+            rs = y_data['mean_int'].values
             gr = np.full_like(rs, i+1)
             tp = np.full_like(rs, tpoint)
             print(data_dir, gr, rs)
             di = pd.DataFrame(np.column_stack([gr, tp, rs]), columns=['Group', 'Timepoint', 'Response'])
-            df = df.append(di, ignore_index=True)
+            df = pd.concat([df, di], ignore_index=True)
+            # df = df.append(di, ignore_index=True)
     df.to_csv(os.path.join(root_dir, 'y.csv'), index=False)
 
 
@@ -180,12 +180,12 @@ def plot_lines(root_dir):
 
 
 if __name__ == '__main__':
-    root_dir = '/home/phuong/data/20220214_Nate/'
-    img_folder = 'imgs'
-    img_dir = os.path.join(root_dir, img_folder)
-    save_dir = os.path.join(root_dir, img_folder + '-results')
-    process_fluo_images(img_dir, save_dir,
-        sb_microns=110, cmax=None, segmt=True, segmt_factor=1, remove_small=25)
+    # root_dir = '/home/phuong/data/20220214_Nate/'
+    # img_folder = 'imgs'
+    # img_dir = os.path.join(root_dir, img_folder)
+    # save_dir = os.path.join(root_dir, img_folder + '-results')
+    # process_fluo_images(img_dir, save_dir, sb_microns=160, cmax_all=False,
+    #     segmt=True, segmt_local=False, segmt_factor=1, remove_small=50)
     # root_dir = '/home/phuong/data/GEX/20220125/'
     # img_folder = 'TxRed'
     # group_labels = [
@@ -198,25 +198,23 @@ if __name__ == '__main__':
 
 
     # for t in ['t0', 't24']:
-    #     root_dir = '/home/phuong/data/GEX/20220209/{}/'.format(t)
+    #     root_dir = '/home/phuong/data/GEX/20220214/{}/'.format(t)
     #     for group_dir in natsorted(os.listdir(root_dir)):
     #         if group_dir == ".directory":
     #             continue
     #         print(group_dir)
-    #         img_dir = os.path.join(root_dir, group_dir, 'TxRed')
+    #         img_dir = os.path.join(root_dir, group_dir, 'Default')
     #         save_dir = os.path.join(root_dir, group_dir, 'results')
-    #         process_fluo_images(img_dir, save_dir,
-    #             sb_microns=110, cmax=None, segmt=False,
-    #             segmt_dots=False, segmt_factor=1, remove_small=100)
-    # root_dir = '/home/phuong/data/GEX/20220209/'
-    # combine_before_after(root_dir)
-    # group_labels = [
-    #     '12TetO Only',
-    #     'TetR-VP64',
-    #     'iLIDslow',
-    #     'iLIDslow + 4x iLIDfast'
-    # ]
-    # plot_before_after(root_dir, group_labels, group_order=[1, 2, 3, 4], figsize=(len(group_labels)*6, 8))
+    #         process_fluo_images(img_dir, save_dir, sb_microns=160, cmax_all=False,
+    #             segmt=False, segmt_local=False, segmt_factor=1, remove_small=50)
+    root_dir = '/home/phuong/data/GEX/20220214/'
+    combine_before_after(root_dir)
+    group_labels = [
+        'LOVfast + iLIDslow\nBL 1s per 2s',
+        'LOVfast + iLIDslow\nBL 1s per 15s',
+        'FUSN iLIDfast',
+    ]
+    plot_before_after(root_dir, group_labels, group_order=[1, 2, 3], figsize=(len(group_labels)*6, 8))
 
 
     # root_dir = '/home/phuong/data/'

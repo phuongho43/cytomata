@@ -154,14 +154,9 @@ def segment_object(img, local=False, factor=1, rs=None):
 def process_fluo_images(img_dir, save_dir, sb_microns=11, cmax_all=True,
     segmt=False, segmt_local=False, segmt_factor=1, remove_small=None):
     """Analyze fluorescence 10x images and generate figures."""
-    if cmax_all:
-        i_max = np.argmax([np.percentile(img_as_float(imread(imgf)), 99.9) for imgf in list_img_files(img_dir)])
-        img, raw, bkg, den = preprocess_img(list_img_files(img_dir)[i_max])
-        cmax = np.percentile(img, 99.99)
     def img_task(data, i, imgf):
         fname = str(i)
         img, raw, bkg, den = preprocess_img(imgf)
-        cmax_i = cmax
         if not cmax_all:
             cmax_i = np.percentile(img, 99.99)
         plot_bkg_profile(fname, save_dir, raw, bkg)
@@ -175,7 +170,7 @@ def process_fluo_images(img_dir, save_dir, sb_microns=11, cmax_all=True,
         img_save_dir = os.path.join(save_dir, 'denoised')
         cell_den = plot_cell_img(den, None, fname, img_save_dir, cmax=cmax_i, sb_microns=sb_microns)
         if segmt:
-            thr, reg, n = segment_object(den, local=segmt_local, factor=segmt_factor, rs=remove_small)
+            thr, reg, n = segment_object(den, segmt_local=segmt_local, factor=segmt_factor, rs=remove_small)
             img_save_dir = os.path.join(save_dir, 'outlined')
             cell_den = plot_cell_img(den, thr, fname, img_save_dir, cmax=cmax_i, sb_microns=sb_microns)
             mi = np.mean(img[thr])
@@ -183,6 +178,10 @@ def process_fluo_images(img_dir, save_dir, sb_microns=11, cmax_all=True,
         return data
     setup_dirs(os.path.join(save_dir, 'subtracted'))
     ta = time.time()
+    if cmax_all:
+        i_max = np.argmax([np.percentile(img_as_float(imread(imgf)), 99.9) for imgf in list_img_files(img_dir)])
+        img, raw, bkg, den = preprocess_img(list_img_files(img_dir)[i_max])
+        cmax_i = np.percentile(img, 99.99)
     data = []
     # for i, imgf in enumerate(list_img_files(img_dir)):
     #     data = img_task(data, i, imgf)
