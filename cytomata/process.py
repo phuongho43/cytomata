@@ -4,40 +4,38 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from scipy import ndimage as ndi
-from skimage import img_as_float
+from skimage import img_as_float, img_as_ubyte
 from skimage.io import imread
 from skimage.measure import label
-from skimage.filters import (gaussian, laplace, median, sobel,
-    threshold_li, threshold_yen, threshold_otsu, threshold_local)
+from skimage.filters import (gaussian, laplace, median, sobel, threshold_multiotsu,
+    threshold_li, threshold_yen, threshold_otsu, threshold_local, rank)
 from skimage.morphology import (remove_small_objects, remove_small_holes, label,
-    disk, binary_erosion, binary_opening, binary_dilation)
+    disk, binary_erosion, binary_opening, binary_dilation, erosion)
 from skimage.restoration import denoise_nl_means, estimate_sigma
 from skimage.segmentation import clear_border, random_walker, find_boundaries, watershed
 from skimage.feature import peak_local_max
 from skimage.color import label2rgb
+from skimage.exposure import rescale_intensity
 
 from cytomata.utils import setup_dirs
-
+import time
 
 def preprocess_img(imgf):
     """Subtract background and denoise fluorescence image."""
     img = img_as_float(imread(imgf))
     raw = img.copy()
     sig = estimate_sigma(img)
-    den = denoise_nl_means(img, h=sig, sigma=sig, patch_size=5, patch_distance=5)
-    raw = den.copy()
+    den = denoise_nl_means(img, h=sig, sigma=sig, patch_size=5, patch_distance=7)
     bkg = den.copy()
-    thr = threshold_local(bkg, block_size=7, param=64)
-    thr = bkg < thr
-    broi = bkg*thr
-    rfrac = 1 - np.var(bkg)/np.mean(bkg)
-    if rfrac < 0.5:
-        rfrac = 0.5
-    elif rfrac > 1.0:
-        rfrac = 1.0
-    tval = np.percentile(broi, rfrac*100)
+    thr = threshold_local(bkg, block_size=5, param=24)
+    broi = bkg * (bkg < thr)
+    if (np.percentile(bkg, 99) - np.percentile(bkg, 1))/np.median(bkg) < 1:
+        broi = broi[(broi > np.percentile(broi, 99))]
+    else:
+        broi = broi[(broi > np.percentile(broi, 50))]
+    tval = threshold_li(broi)
     bkg[bkg >= tval] = tval
-    bkg = gaussian(bkg, 64)
+    bkg = gaussian(bkg, 64) + sig
     bkg[bkg < 0] = 0
     img = (img - bkg) / bkg
     img[img < 0] = 0
@@ -46,22 +44,17 @@ def preprocess_img(imgf):
     return img, raw, bkg, den
 
 
-def segment_object(img, factor=1, rs=None, fh=None, cb=None):
+def segment_object(img, factor=1, rs=None):
     """Segment out bright objects from fluorescence image."""
     if not np.any(img):
-        return img.astype(bool)
-    img = gaussian(img, 3)
-    thv_ots = threshold_otsu(img) / 3
-    thv_yen = threshold_yen(img) / 3
-    thv_li = threshold_li(img)
-    thv = np.median([thv_ots, thv_yen, thv_li]) * factor
+        thr = img.astype(bool)
+        reg, n = None, 0
+        return thr, reg, n
+    thv = threshold_local(img, block_size=5, param=24) * factor
+    # thv = threshold_li(img) * factor
     thr = img > thv
     if rs is not None:
         thr = remove_small_objects(ndi.label(thr)[0].astype(bool), min_size=rs)
-    if fh is not None:
-        thr = remove_small_holes(thr.astype(bool), area_threshold=fh)
-    if cb is not None:
-        thr = clear_border(thr, buffer_size=cb)
     reg, n = ndi.label(thr)
     return thr, reg, n
 

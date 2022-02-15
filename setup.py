@@ -44,7 +44,7 @@ setuptools.setup(
     license=cytomata.__license__,
     packages=setuptools.find_packages(exclude=['tests']),
     install_requires=[
-        'numpy', 'scipy', 'pandas', 'matplotlib', 'seaborn', 'scikit-image',
+        'numpy', 'scipy', 'pandas', 'matplotlib', 'seaborn', 'scikit-image', 'joblib',
         'opencv-python', 'natsort', 'tqdm', 'lmfit', 'pycromanager', 'filterpy'
     ]
 )
