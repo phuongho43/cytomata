@@ -173,7 +173,9 @@ def combine_uy(root_dir, fold_change=True, plot_u=True):
         combined_y = pd.DataFrame()
         combined_tu = pd.DataFrame()
         combined_u = pd.DataFrame()
+        n = 0
         for i, data_dir in enumerate(natsorted([x[1] for x in os.walk(root_dir)][0])):
+            n += 1
             y_csv = os.path.join(root_dir, data_dir, 'y.csv')
             y_data = pd.read_csv(y_csv)
             t = y_data['t'].values
@@ -186,7 +188,7 @@ def combine_uy(root_dir, fold_change=True, plot_u=True):
             if fold_change:
                 y = y/np.mean(y[:5])
             combined_y = pd.concat([combined_y, y], axis=1)
-            ax.plot(y, color='#1976D2', alpha=1, linewidth=1)
+            ax.plot(y, color='#648FFF', alpha=1, linewidth=1)
             u_csv = os.path.join(root_dir, data_dir, 'u.csv')
             if plot_u:
                 u_data = pd.read_csv(u_csv)
@@ -212,14 +214,20 @@ def combine_uy(root_dir, fold_change=True, plot_u=True):
         ax.plot(y_ave, color='#648FFF', label='Ave')
         ax.set_xlabel('Time (s)')
         ax.set_ylabel('AU')
+        ax.text(0.96, 1.01, 'n={}'.format(n), ha='left', va='center', fontsize=16, transform=ax.transAxes)
         if fold_change:
             ax.set_ylabel('Fold Change')
-        # ax.legend(loc='best')
+        ax.legend(loc='best')
         if plot_u:
             ax0.plot(tu, u, color='#648FFF')
             ax0.set_yticks([0, 1])
-            ax0.set_ylabel('BL')
+            ax0.set_ylabel('BL')    
         plot_name = 'y.png'
         fig.savefig(os.path.join(root_dir, plot_name),
             dpi=100, bbox_inches='tight', transparent=False)
         plt.close(fig)
+
+
+if __name__ == '__main__':
+    root_dir = '/home/phuong/data/ILID/ddFP/RA-27V/20200921-B3-sspBu_RA-27V_spike/results/'
+    combine_uy(root_dir)

@@ -2,23 +2,16 @@ import os
 
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 from scipy import ndimage as ndi
-from skimage import img_as_float, img_as_ubyte
+from skimage import img_as_float
 from skimage.io import imread
-from skimage.measure import label
-from skimage.filters import (gaussian, laplace, median, sobel, threshold_multiotsu,
-    threshold_li, threshold_yen, threshold_otsu, threshold_local, rank)
-from skimage.morphology import (remove_small_objects, remove_small_holes, label,
-    disk, binary_erosion, binary_opening, binary_dilation, erosion)
+from skimage.filters import gaussian, threshold_li, threshold_local
+from skimage.morphology import remove_small_objects
 from skimage.restoration import denoise_nl_means, estimate_sigma
-from skimage.segmentation import clear_border, random_walker, find_boundaries, watershed
-from skimage.feature import peak_local_max
-from skimage.color import label2rgb
-from skimage.exposure import rescale_intensity
 
 from cytomata.utils import setup_dirs
 import time
+
 
 def preprocess_img(imgf):
     """Subtract background and denoise fluorescence image."""
@@ -59,22 +52,6 @@ def segment_object(img, segmt_local=False, factor=1, rs=None):
         thr = remove_small_objects(ndi.label(thr)[0].astype(bool), min_size=rs)
     reg, n = ndi.label(thr)
     return thr, reg, n
-
-
-def segment_clusters(img, factor=1, rs=None):
-    """Segment out bright clusters from fluorescence image."""
-    thv_img = threshold_li(img)
-    thr_img = median(img > thv_img, disk(5))
-    log = gaussian(laplace(img, mask=thr_img), sigma=2)
-    samp = img[thr_img]
-    samp = samp[samp < np.percentile(samp, 95)]
-    thr = log > (0.1*np.std(samp) * factor)
-    thr = median(thr, disk(1))
-    if rs is not None:
-        thr = remove_small_objects(ndi.label(thr)[0].astype(bool), min_size=rs)
-    if not np.any(thr):
-        thr = thr_img
-    return thr
 
 
 def process_u_csv(ty, u_csv, save_dir):

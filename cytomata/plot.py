@@ -16,12 +16,12 @@ from cytomata.utils import setup_dirs, custom_styles, custom_palette
 def plot_cell_img(img, thr, fname, save_dir, cmax, sig_ann=False, t_unit=None, sb_microns=None):
     setup_dirs(save_dir)
     with plt.style.context(('seaborn-whitegrid', custom_styles)), sns.color_palette(custom_palette):
-        fig, ax = plt.subplots(figsize=(10,8))
+        fig, ax = plt.subplots(figsize=(18,12))
         axim = ax.imshow(img, cmap='turbo')
         axim.set_clim(0.0, cmax)
         if t_unit:
             t_text = 't = ' + fname + t_unit
-            ax.annotate(t_text, (16, 32), color='white', fontsize=20)
+            ax.text(0.05, 0.95, t_text, ha='left', va='center', fontsize=20, transform=ax.transAxes)
         if sb_microns is not None:
             fontprops = font_manager.FontProperties(size=20)
             asb = AnchoredSizeBar(ax.transData, 100, u'{}\u03bcm'.format(sb_microns),
@@ -34,8 +34,8 @@ def plot_cell_img(img, thr, fname, save_dir, cmax, sig_ann=False, t_unit=None, s
                 linewidth=5, edgecolor='#648FFF', facecolor='none'))
         ax.grid(False)
         ax.axis('off')
-        cb = fig.colorbar(axim, pad=0.01, format='%.3f',
-            extend='both', extendrect=True, extendfrac=0.03)
+        cb = fig.colorbar(axim, pad=0.01, format='%.3f', extend='both', extendrect=True,
+                ticks=np.linspace(np.min(img), cmax, 10))
         cb.outline.set_linewidth(0)
         fig.tight_layout(pad=0)
         if thr is not None:

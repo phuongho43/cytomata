@@ -151,13 +151,14 @@ def segment_object(img, local=False, factor=1, rs=None):
     return thr, reg, n
 
 
-def process_fluo_images(img_dir, save_dir, sb_microns=11, cmax_all=True,
+def process_fluo_images(img_dir, save_dir, sb_microns=11, cmax=None,
     segmt=False, segmt_local=False, segmt_factor=1, remove_small=None):
     """Analyze fluorescence 10x images and generate figures."""
     def img_task(data, i, imgf):
         fname = str(i)
         img, raw, bkg, den = preprocess_img(imgf)
-        if not cmax_all:
+        cmax_i = cmax
+        if cmax is None:
             cmax_i = np.percentile(img, 99.99)
         plot_bkg_profile(fname, save_dir, raw, bkg)
         thr = None
@@ -170,7 +171,7 @@ def process_fluo_images(img_dir, save_dir, sb_microns=11, cmax_all=True,
         img_save_dir = os.path.join(save_dir, 'denoised')
         cell_den = plot_cell_img(den, None, fname, img_save_dir, cmax=cmax_i, sb_microns=sb_microns)
         if segmt:
-            thr, reg, n = segment_object(den, segmt_local=segmt_local, factor=segmt_factor, rs=remove_small)
+            thr, reg, n = segment_object(den, local=segmt_local, factor=segmt_factor, rs=remove_small)
             img_save_dir = os.path.join(save_dir, 'outlined')
             cell_den = plot_cell_img(den, thr, fname, img_save_dir, cmax=cmax_i, sb_microns=sb_microns)
             mi = np.mean(img[thr])
@@ -178,10 +179,6 @@ def process_fluo_images(img_dir, save_dir, sb_microns=11, cmax_all=True,
         return data
     setup_dirs(os.path.join(save_dir, 'subtracted'))
     ta = time.time()
-    if cmax_all:
-        i_max = np.argmax([np.percentile(img_as_float(imread(imgf)), 99.9) for imgf in list_img_files(img_dir)])
-        img, raw, bkg, den = preprocess_img(list_img_files(img_dir)[i_max])
-        cmax_i = np.percentile(img, 99.99)
     data = []
     # for i, imgf in enumerate(list_img_files(img_dir)):
     #     data = img_task(data, i, imgf)
@@ -205,18 +202,18 @@ if __name__ == '__main__':
     #-------denoised (bkg subtracted + denoising algorithm applied)
     #-------outlined (denoised image with object segmentation regions outlined in white)
     #-------y.csv (data extracted from image)
-    root_dir = '/home/phuong/data/20220214_Nate/'
+    root_dir = '/home/phuong/data/20220314_Nate'
     img_folder = 'imgs'
 
     ## Parameters ##
     sb_microns = 110  # [float] specify scalebar label in microns or None for no scalebar
-    cmax_all = True  # [bool] Whether to calculate colorbar upper limit based on the max intensity of all images (and use that same one for every image) or to calculate based on max intensity of each individual image
+    cmax = None  # [float] Colorbar upper limit value. Leave None to auto calculate.
     segmt = True  # [bool] Whether to perform object segmentation and calculate mean intensity of only pixels in those regions or don't and calculate it using every pixel in the whole image
     segmt_local = True  # [bool] Whether to use local thresholding or global thresholding for the segmentation
-    segmt_factor = 1  # [float] Tune the thresholding. Higher => exclude dimmer regions | Lower => include dimmer regions
+    segmt_factor = 10  # [float] Tune the thresholding. Higher => exclude dimmer regions | Lower => include dimmer regions
     remove_small = 25  # [int] Excludes regions smaller than the specified area in pixels squared
 
     img_dir = os.path.join(root_dir, img_folder)
     save_dir = os.path.join(root_dir, img_folder + '-results')
-    process_fluo_images(img_dir, save_dir, sb_microns=sb_microns, cmax_all=cmax_all,
+    process_fluo_images(img_dir, save_dir, sb_microns=sb_microns, cmax=cmax,
         segmt=segmt, segmt_local=segmt_local, segmt_factor=segmt_factor, remove_small=remove_small)
