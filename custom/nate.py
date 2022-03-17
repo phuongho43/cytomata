@@ -175,7 +175,7 @@ def process_fluo_images(img_dir, save_dir, sb_microns=11, cmax=None,
             img_save_dir = os.path.join(save_dir, 'outlined')
             cell_den = plot_cell_img(den, thr, fname, img_save_dir, cmax=cmax_i, sb_microns=sb_microns)
             mi = np.mean(img[thr])
-            if n < 10 or np.isnan(mi):
+            if np.isnan(mi):
                 mi = np.mean(img)
         data = {'fname': fname, 'mean_int': mi, 'num_cells': n}
         return data
@@ -211,9 +211,9 @@ if __name__ == '__main__':
     sb_microns = 110  # [float] specify scalebar label in microns or None for no scalebar
     cmax = None  # [float] Colorbar upper limit value. Leave None to auto calculate.
     segmt = True  # [bool] Whether to perform object segmentation and calculate mean intensity of only pixels in those regions or don't and calculate it using every pixel in the whole image
-    segmt_local = True  # [bool] Whether to use local thresholding or global thresholding for the segmentation
-    segmt_factor = 10  # [float] Tune the thresholding. Higher => exclude dimmer regions | Lower => include dimmer regions
-    remove_small = 25  # [int] Excludes regions smaller than the specified area in pixels squared
+    segmt_local = False  # [bool] Whether to use local thresholding or global thresholding for the segmentation
+    segmt_factor = 1  # [float] Tune the thresholding. Higher => exclude dimmer regions | Lower => include dimmer regions
+    remove_small = 500  # [int] Excludes regions smaller than the specified area in pixels squared
 
     img_dir = os.path.join(root_dir, img_folder)
     save_dir = os.path.join(root_dir, img_folder + '-results')
