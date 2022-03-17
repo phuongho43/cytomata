@@ -24,6 +24,7 @@ shutil.copyfile(MM_CFG_FILE, cfg_file_save)
 
 mscope = Microscope(SETTINGS, MM_CFG_FILE)
 mscope.core.clear_roi()
+mscope.core.clear_circular_buffer()
 exp0 = mscope.core.get_exposure()
 mscope.core.set_exposure(0)
 mscope.set_channel('BL1')
@@ -32,6 +33,7 @@ mscope.core.set_shutter_open(False)
 img = mscope.snap_image()
 mscope.core.set_exposure(exp0)
 mscope.core.set_auto_shutter(True)
+
 
 if SETTINGS['roi_center']:
     mscope.core.set_roi(300, 300, 600, 600)

@@ -13,7 +13,7 @@ expt_name = input('Expt Directory Name: ')
 expt_name = ''.join([x if x.isalnum() or x in '-_.' else '_' for x in expt_name])
 SETTINGS['save_dir'] = os.path.join('expts', time.strftime('%Y%m%d_') + expt_name)
 if os.path.exists(SETTINGS['save_dir']):
-    input('Directory already exists. Overwrite?...Press Ctrl-C to abort.')
+    input('Directory already exists. Overwrite?...Press Ctrl-C to abort. Press ENTER to continue.')
 setup_dirs(SETTINGS['save_dir'])
 settings_file = os.path.join(CONFIG_DIR, 'mm_settings.py')
 settings_file_save = os.path.join(SETTINGS['save_dir'], 'settings.txt')
@@ -34,4 +34,4 @@ mscope.core.set_exposure(exp0)
 mscope.core.set_auto_shutter(True)
 
 
-mscope.snap_xyfield(chs=['DIC', 'YFP'], n=3, step=1320)
+mscope.snap_xyfield(chs=['TxRed'], n=3, step=1320)

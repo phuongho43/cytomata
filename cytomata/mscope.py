@@ -85,7 +85,7 @@ class Microscope(object):
         while True:
             if self.core.get_remaining_image_count() > 0:
                 timg = self.core.get_last_tagged_image()
-                img = convert_tagged_img(timg)
+                img = self.convert_tagged_img(timg)
                 img = cv2.normalize(img, dst=None,
                     alpha=0, beta=2**n_bits - 1, norm_type=cv2.NORM_MINMAX)
                 cv2.imshow('Coordinate Picker', img)
@@ -136,20 +136,20 @@ class Microscope(object):
     def snap_xyfield(self, chs, n=3, step=132):
         x0, y0 = self.get_position('xy')
         grid = np.arange(-(n//2)*step, (n//2)*step + step, step)
-        tstamp = time.strftime('%Y%m%d-%H%M%S')
-        img_dir = os.path.join(self.save_dir, tstamp + '_xyfield')
+        # tstamp = time.strftime('%Y%m%d-%H%M%S')
+        # img_dir = os.path.join(self.save_dir, tstamp + '_xyfield')
         imgs = []
-        for ch in chs:
-            self.set_channel(ch)
-            for i, yi in enumerate(grid):
-                for j, xi in enumerate(grid):
-                    if not i % 2:
-                        xi = -xi
-                    self.set_position('xy', (x0 + xi, y0 + yi))
+        for i, yi in enumerate(grid):
+            for j, xi in enumerate(grid):
+                if not i % 2:
+                    xi = -xi
+                self.set_position('xy', (x0 + xi, y0 + yi))
+                for ch in chs:
+                    self.set_channel(ch)
                     img = self.snap_image()
                     imgs.append((i, j, ch, img))
         for i, j, ch, img in imgs:
-            ch_dir = os.path.join(img_dir, ch)
+            ch_dir = os.path.join(self.save_dir, ch)
             setup_dirs(ch_dir)
             img_path = os.path.join(ch_dir, str(i) + '_' + str(j) + '.tiff')
             with warnings.catch_warnings():
@@ -197,6 +197,7 @@ class Microscope(object):
         time.sleep(width)
         self.core.set_shutter_open(False)
         tb = time.time() - self.t0
+        self.core.set_auto_shutter(True)
         self.uta[cid].append(ta)
         self.utb[cid].append(tb)
         u_path = os.path.join(self.save_dir, 'u' + str(cid) + '.csv')
@@ -226,13 +227,13 @@ class Microscope(object):
         img = self.snap_image()
         return np.var(laplace(img))
 
-    def autofocus(self, cid, ch, bounds=[-50.0, 50.0], z_step=10.0, offset=0):
+    def autofocus(self, cid, ch, bounds=[-10.0, 10.0], z_step=5.0, offset=0.0):
         self.set_channel(ch)
         zi = self.get_position('z')
-        zl = np.max([zi + bounds[0], self.z0 - 50.0])
-        zu = np.min([zi + bounds[1], self.z0 + 50.0])
+        zl = zi + bounds[0]
+        zu = zi + bounds[1]
         best_foc = 0
-        best_pos = None
+        best_pos = zi
         for zz in np.arange(zl, zu, z_step):
             self.set_position('z', zz)
             foc = self.measure_focus()

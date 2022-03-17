@@ -18,22 +18,22 @@ SETTINGS = {
     'stage_z_limit': [-240, 240],
     'stage_x_limit': [-9600, 9600],
     'stage_y_limit': [-9600, 9600],
-    'mpos': '', # '', 'sequential', 'parallel'
-    'mpos_ch': 'mCherry',
+    'mpos': 'parallel', # None or 'sequential' or 'parallel'
+    'mpos_ch': 'TxRed',
     'roi_center': False,
 }
 
 
 # Seconds-Timescale ##
-IMAGING = {
-    't_info': [(0, 56, 5), (60, 62, 1), (65, 181, 5)],  # (start, stop, period)
-    'chs': ['mCherry']
-}
+# IMAGING = {
+#    't_info': [(0, 601, 5)],  # (start, stop, period)
+#    'chs': ['mCherry']
+# }
 
-INDUCTION = {
-    't_info': [(60, 61, 1, 1)],  # (start, stop, period, width)
-    'ch_ind': 'BL1'
-}
+# INDUCTION = {
+#    't_info': [(60, 65, 5, 5)],  # (start, stop, period, width)
+#    'ch_ind': 'BL1'
+# }
 
 
 # Seconds-Timescale ## Pulsatile ##
@@ -50,31 +50,31 @@ INDUCTION = {
 
 # Minutes-Timescale ##
 # IMAGING = {
-#     't_info': [(0, 301, 10)],
-#     'chs': ['mCherry', 'CFP']
+#     't_info': [(0, 1, 1), (300, 301, 1)],
+#     'chs': ['GFP']
 # }
 
 # INDUCTION = {
-#     't_info': [(60, 300, 10, 8)],
+#     't_info': [(0, 301, 2, 1)],
 #     'ch_ind': 'BL1'
 # }
 
 
 # Hours-Timescale ## 
-# IMAGING = {
-#     't_info': [(0, 57601, 300)],
-#     'chs': ['DIC', 'TxRed']
-# }
+IMAGING = {
+    't_info': [(0, 86401, 300)],
+    'chs': ['DIC', 'CFP', 'GFP', 'TxRed']
+}
 
 # INDUCTION = {
 #     't_info': [(0, 57600, 10, 1)],
 #     'ch_ind': 'BL1'
 # }
 
-# AUTOFOCUS = {
-#     't_info': [(0, 57600, 300)],
-#     'ch': 'DIC',
-#     'bounds': [-20.0, 20.0],
-#     'z_step': 10.0,
-#     'offset': 5
-# }
+AUTOFOCUS = {
+    't_info': [(0, 86400, 300)],
+    'ch': 'DIC',
+    'bounds': [-10.0, 10.0],
+    'z_step': 5.0,
+    'offset': 0.0
+}
