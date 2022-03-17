@@ -175,6 +175,8 @@ def process_fluo_images(img_dir, save_dir, sb_microns=11, cmax=None,
             img_save_dir = os.path.join(save_dir, 'outlined')
             cell_den = plot_cell_img(den, thr, fname, img_save_dir, cmax=cmax_i, sb_microns=sb_microns)
             mi = np.mean(img[thr])
+            if n < 10 or np.isnan(mi):
+                mi = np.mean(img)
         data = {'fname': fname, 'mean_int': mi, 'num_cells': n}
         return data
     setup_dirs(os.path.join(save_dir, 'subtracted'))
@@ -202,7 +204,7 @@ if __name__ == '__main__':
     #-------denoised (bkg subtracted + denoising algorithm applied)
     #-------outlined (denoised image with object segmentation regions outlined in white)
     #-------y.csv (data extracted from image)
-    root_dir = '/home/phuong/data/20220314_Nate'
+    root_dir = '/home/wanglab/data/20220314/'
     img_folder = 'imgs'
 
     ## Parameters ##
