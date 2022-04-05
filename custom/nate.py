@@ -22,6 +22,7 @@ from skimage.exposure import rescale_intensity
 from skimage.filters import (gaussian, median, threshold_li, threshold_local)
 from skimage.morphology import remove_small_objects
 from skimage.restoration import denoise_nl_means, estimate_sigma
+from skimage.measure import regionprops
 
 
 custom_palette = ['#648FFF', '#FE6100', '#DC267F', '#785EF0', '#FFB000']
@@ -154,8 +155,8 @@ def segment_object(img, local=False, factor=1, rs=None):
 def process_fluo_images(img_dir, save_dir, sb_microns=11, cmax=None,
     segmt=False, segmt_local=False, segmt_factor=1, remove_small=None):
     """Analyze fluorescence 10x images and generate figures."""
-    def img_task(data, i, imgf):
-        fname = str(i)
+    def img_task(imgf):
+        fname = os.path.basename(imgf)
         img, raw, bkg, den = preprocess_img(imgf)
         cmax_i = cmax
         if cmax is None:
@@ -172,23 +173,27 @@ def process_fluo_images(img_dir, save_dir, sb_microns=11, cmax=None,
         cell_den = plot_cell_img(den, None, fname, img_save_dir, cmax=cmax_i, sb_microns=sb_microns)
         if segmt:
             thr, reg, n = segment_object(den, local=segmt_local, factor=segmt_factor, rs=remove_small)
+            ints = np.array([prop.mean_intensity for prop in regionprops(reg, img)])
             img_save_dir = os.path.join(save_dir, 'outlined')
             cell_den = plot_cell_img(den, thr, fname, img_save_dir, cmax=cmax_i, sb_microns=sb_microns)
             mi = np.mean(img[thr])
             if np.isnan(mi):
                 mi = np.mean(img)
         data = {'fname': fname, 'mean_int': mi, 'num_cells': n}
-        return data
+        return data, ints
     setup_dirs(os.path.join(save_dir, 'subtracted'))
-    ta = time.time()
     data = []
-    # for i, imgf in enumerate(list_img_files(img_dir)):
-    #     data = img_task(data, i, imgf)
-    #     print(i)
-    data = Parallel(n_jobs=os.cpu_count())(delayed(img_task)(data, i, imgf) for i, imgf in enumerate(list_img_files(img_dir)))
-    df = pd.DataFrame(data)
-    df.to_csv(os.path.join(save_dir, 'y.csv'), index=False)
-    print(time.time() - ta)
+    ints = {}
+    n_imgs = len(list_img_files(img_dir))
+    for imgf in list_img_files(img_dir):
+        print(imgf)
+        data_i, ints_i = img_task(imgf)
+        data.append(data_i)
+        ints[os.path.basename(imgf)] = ints_i
+    df_data = pd.DataFrame(data)
+    df_data.to_csv(os.path.join(save_dir, 'y.csv'), index=True)
+    df_ints = pd.DataFrame.from_dict(ints, orient='index').transpose()
+    df_ints.to_csv(os.path.join(save_dir, 'y_ints.csv'), index=False)
 
 
 if __name__ == '__main__':
@@ -204,16 +209,16 @@ if __name__ == '__main__':
     #-------denoised (bkg subtracted + denoising algorithm applied)
     #-------outlined (denoised image with object segmentation regions outlined in white)
     #-------y.csv (data extracted from image)
-    root_dir = '/home/wanglab/data/20220314/'
-    img_folder = 'imgs'
+    root_dir = '/home/phuong/data/myra/20220328/20220328_12TetO-mScl-CellLine_TetR-VPR_TxRed/'
+    img_folder = 'Default'
 
     ## Parameters ##
     sb_microns = 110  # [float] specify scalebar label in microns or None for no scalebar
     cmax = None  # [float] Colorbar upper limit value. Leave None to auto calculate.
     segmt = True  # [bool] Whether to perform object segmentation and calculate mean intensity of only pixels in those regions or don't and calculate it using every pixel in the whole image
-    segmt_local = False  # [bool] Whether to use local thresholding or global thresholding for the segmentation
-    segmt_factor = 1  # [float] Tune the thresholding. Higher => exclude dimmer regions | Lower => include dimmer regions
-    remove_small = 500  # [int] Excludes regions smaller than the specified area in pixels squared
+    segmt_local = True  # [bool] Whether to use local thresholding or global thresholding for the segmentation
+    segmt_factor = 0.5  # [float] Tune the thresholding. Higher => exclude dimmer regions | Lower => include dimmer regions
+    remove_small = 100  # [int] Excludes regions smaller than the specified area in pixels squared
 
     img_dir = os.path.join(root_dir, img_folder)
     save_dir = os.path.join(root_dir, img_folder + '-results')

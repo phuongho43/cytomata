@@ -28,13 +28,14 @@ from cytomata.process import preprocess_img, segment_object, process_u_csv
 from cytomata.utils import setup_dirs, list_img_files, custom_styles, custom_palette
 
 
-def process_fluo_images(img_dir, save_dir, sb_microns=11, cmax_all=True,
+def process_fluo_images(img_dir, save_dir, sb_microns=11, cmax=None,
     segmt=False, segmt_local=False, segmt_factor=1, remove_small=None):
     """Analyze fluorescence 10x images and generate figures."""
     def img_task(data, i, imgf):
         fname = str(i)
         img, raw, bkg, den = preprocess_img(imgf)
-        if not cmax_all:
+        cmax_i = cmax
+        if cmax is None:
             cmax_i = np.percentile(img, 99.99)
         plot_bkg_profile(fname, save_dir, raw, bkg)
         thr = None
@@ -57,10 +58,6 @@ def process_fluo_images(img_dir, save_dir, sb_microns=11, cmax_all=True,
         return data
     setup_dirs(os.path.join(save_dir, 'subtracted'))
     ta = time.time()
-    if cmax_all:
-        i_max = np.argmax([np.percentile(img_as_float(imread(imgf)), 99.9) for imgf in list_img_files(img_dir)])
-        img, raw, bkg, den = preprocess_img(list_img_files(img_dir)[i_max])
-        cmax_i = np.percentile(img, 99.99)
     data = []
     # for i, imgf in enumerate(list_img_files(img_dir)):
     #     data = img_task(data, i, imgf)
@@ -164,12 +161,12 @@ def plot_lines(root_dir):
 
 
 if __name__ == '__main__':
-    # root_dir = '/home/phuong/data/ILID/FP/20220223_mScI-sspBn-mycNLS-VPR/'
-    # img_folder = 'TxRed'
-    # img_dir = os.path.join(root_dir, img_folder)
-    # save_dir = os.path.join(root_dir, img_folder + '-results')
-    # process_fluo_images(img_dir, save_dir, sb_microns=110, cmax_all=False,
-    #     segmt=True, segmt_local=True, segmt_factor=1, remove_small=50)
+    root_dir = '/home/phuong/data/GEX/20220403_TetO-YB-NLS-mScI_TetR-VP64-mTq2-NES/'
+    img_folder = 'TxRed'
+    img_dir = os.path.join(root_dir, img_folder)
+    save_dir = os.path.join(root_dir, img_folder + '-results')
+    process_fluo_images(img_dir, save_dir, sb_microns=110, cmax=None,
+        segmt=False, segmt_local=False, segmt_factor=1, remove_small=50)
     # root_dir = '/home/phuong/data/GEX/20220125/'
     # img_folder = 'TxRed'
     # group_labels = [
@@ -181,25 +178,25 @@ if __name__ == '__main__':
     # plot_groups(root_dir, group_labels, group_order=[1, 2, 3], figsize=(len(group_labels)*8, 8))
 
 
-    for t in ['t0', 't24']:
-        root_dir = '/home/phuong/data/GEX/20220311/{}/'.format(t)
-        for group_dir in natsorted(os.listdir(root_dir)):
-            if group_dir == ".directory":
-                continue
-            print(group_dir)
-            img_dir = os.path.join(root_dir, group_dir, 'TxRed')
-            save_dir = os.path.join(root_dir, group_dir, 'results')
-            process_fluo_images(img_dir, save_dir, sb_microns=110, cmax_all=False,
-                segmt=False, segmt_local=False, segmt_factor=1, remove_small=50)
-    root_dir = '/home/phuong/data/GEX/20220311/'
-    combine_before_after(root_dir)
-    group_labels = [
-        'BL 1s per 25s',
-        'BL 1s per 20s',
-        'BL 1s per 15s',
-        'BL 1s per 10s',
-    ]
-    plot_before_after(root_dir, group_labels, group_order=[4, 3, 2, 1], figsize=(len(group_labels)*6, 8))
+    # for t in ['t0', 't24']:
+    #     root_dir = '/home/phuong/data/GEX/20220311/{}/'.format(t)
+    #     for group_dir in natsorted(os.listdir(root_dir)):
+    #         if group_dir == ".directory":
+    #             continue
+    #         print(group_dir)
+    #         img_dir = os.path.join(root_dir, group_dir, 'TxRed')
+    #         save_dir = os.path.join(root_dir, group_dir, 'results')
+    #         process_fluo_images(img_dir, save_dir, sb_microns=110, cmax_all=False,
+    #             segmt=False, segmt_local=False, segmt_factor=1, remove_small=50)
+    # root_dir = '/home/phuong/data/GEX/20220311/'
+    # combine_before_after(root_dir)
+    # group_labels = [
+    #     'BL 1s per 25s',
+    #     'BL 1s per 20s',
+    #     'BL 1s per 15s',
+    #     'BL 1s per 10s',
+    # ]
+    # plot_before_after(root_dir, group_labels, group_order=[4, 3, 2, 1], figsize=(len(group_labels)*6, 8))
 
 
     # root_dir = '/home/phuong/data/'
