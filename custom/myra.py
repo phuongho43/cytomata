@@ -2,6 +2,7 @@ import os
 import time
 import imghdr
 import warnings
+import itertools
 from joblib import Parallel, delayed
 
 import numpy as np
@@ -14,6 +15,7 @@ from scipy import ndimage as ndi
 
 from matplotlib import font_manager
 from matplotlib.patches import Rectangle
+from matplotlib.colors import ListedColormap
 from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
 
 from skimage import img_as_float, img_as_ubyte, img_as_uint
@@ -22,9 +24,10 @@ from skimage.exposure import rescale_intensity
 from skimage.filters import (gaussian, median, threshold_li, threshold_local)
 from skimage.morphology import remove_small_objects
 from skimage.restoration import denoise_nl_means, estimate_sigma
+from skimage.measure import regionprops
 
 
-custom_palette = ['#648FFF', '#FE6100', '#DC267F', '#785EF0', '#FFB000']
+custom_palette = ['#648FFF', '#DC267F', '#FE6100', '#FFB000', '#785EF0']
 
 custom_styles = {
     'figure.figsize': (16, 8),
@@ -134,13 +137,13 @@ def preprocess_img(imgf):
     return img, raw, bkg, den
 
 
-def segment_object(img, local=False, factor=1, rs=None):
+def segment_object(img, segmt_local=False, factor=1, rs=None):
     """Segment out bright objects from fluorescence image."""
     if not np.any(img):
         thr = img.astype(bool)
         reg, n = None, 0
         return thr, reg, n
-    if local:
+    if segmt_local:
         thv = threshold_local(img, block_size=5, param=24) * factor
     else:
         thv = threshold_li(img) * factor
@@ -276,7 +279,7 @@ if __name__ == '__main__':
         'HEK293T',
         'L929',
     ]
-    group_order = [1, 2] # Order to plot each group on the bargraph
+    group_order = [1, 2] # Order to plot each group on axis
     sb_microns = 110  # [float] Specify scalebar label in microns or None for no scalebar
     cmax = None  # [float] Colorbar upper limit value. Leave None to auto calculate.
     segmt = True  # [bool] Whether to perform object segmentation and calculate mean intensity of only pixels in those regions or don't and calculate it using every pixel in the whole image
@@ -286,6 +289,7 @@ if __name__ == '__main__':
     before_after = False  # [bool] Set True if "before-after" images for each group were taken.
     
     ## General File Structure ##
+    #-Root_Dir
     #---Group_Dir
     #-----Imgs_Dir/Channel_Dir
     #-------1.tif (can be named whatever)

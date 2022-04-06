@@ -122,7 +122,7 @@ def plot_groups(root_dir, group_labels, group_order, figsize=(16, 8), hist=False
     with plt.style.context(('seaborn-whitegrid', custom_styles)), sns.color_palette(custom_palette):
         fig, ax = plt.subplots(figsize=figsize)
         if hist:
-            g = sns.histplot(data=df, ax=ax, x='response', hue='group', common_bins=True, log_scale=False, linewidth=0.2, alpha=0.8, palette=ListedColormap(custom_palette))
+            g = sns.histplot(data=df, ax=ax, x='response', hue='group', common_bins=True, log_scale=False, linewidth=0.2, alpha=0.5, palette=ListedColormap(custom_palette))
             ax.set_xlabel('Fluorescence (AU)')
             ax.set_ylabel('Count')
             g.legend_.set_title(None)

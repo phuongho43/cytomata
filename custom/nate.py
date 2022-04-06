@@ -2,6 +2,7 @@ import os
 import time
 import imghdr
 import warnings
+import itertools
 from joblib import Parallel, delayed
 
 import numpy as np
@@ -9,11 +10,12 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-from natsort import natsorted
+from natsort import natsorted, ns
 from scipy import ndimage as ndi
 
 from matplotlib import font_manager
 from matplotlib.patches import Rectangle
+from matplotlib.colors import ListedColormap
 from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
 
 from skimage import img_as_float, img_as_ubyte, img_as_uint
@@ -25,7 +27,7 @@ from skimage.restoration import denoise_nl_means, estimate_sigma
 from skimage.measure import regionprops
 
 
-custom_palette = ['#648FFF', '#FE6100', '#DC267F', '#785EF0', '#FFB000']
+custom_palette = ['#648FFF', '#DC267F', '#FE6100', '#FFB000', '#785EF0']
 
 custom_styles = {
     'figure.figsize': (16, 8),
@@ -135,13 +137,13 @@ def preprocess_img(imgf):
     return img, raw, bkg, den
 
 
-def segment_object(img, local=False, factor=1, rs=None):
+def segment_object(img, segmt_local=False, factor=1, rs=None):
     """Segment out bright objects from fluorescence image."""
     if not np.any(img):
         thr = img.astype(bool)
         reg, n = None, 0
         return thr, reg, n
-    if local:
+    if segmt_local:
         thv = threshold_local(img, block_size=5, param=24) * factor
     else:
         thv = threshold_li(img) * factor
@@ -155,72 +157,219 @@ def segment_object(img, local=False, factor=1, rs=None):
 def process_fluo_images(img_dir, save_dir, sb_microns=11, cmax=None,
     segmt=False, segmt_local=False, segmt_factor=1, remove_small=None):
     """Analyze fluorescence 10x images and generate figures."""
-    def img_task(imgf):
-        fname = os.path.basename(imgf)
+    def img_task(data, imgf):
+        fname = os.path.splitext(os.path.basename(imgf))[0]
         img, raw, bkg, den = preprocess_img(imgf)
-        cmax_i = cmax
-        if cmax is None:
-            cmax_i = np.percentile(img, 99.99)
         plot_bkg_profile(fname, save_dir, raw, bkg)
-        thr = None
-        mi = np.mean(img)
-        n = 0
         img_path = os.path.join(save_dir, 'subtracted', fname + '.tiff')
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             imsave(img_path, img_as_uint(rescale_intensity(img)))
+        cmax_i = cmax
+        if cmax is None:
+            cmax_i = np.percentile(img, 99.99)
         img_save_dir = os.path.join(save_dir, 'denoised')
         cell_den = plot_cell_img(den, None, fname, img_save_dir, cmax=cmax_i, sb_microns=sb_microns)
+        mi = np.mean(img)
+        data = {'i': fname, 'y': mi}
         if segmt:
-            thr, reg, n = segment_object(den, local=segmt_local, factor=segmt_factor, rs=remove_small)
-            ints = np.array([prop.mean_intensity for prop in regionprops(reg, img)])
+            thr, reg, n = segment_object(den, segmt_local=segmt_local, factor=segmt_factor, rs=remove_small)
+            data = [prop.mean_intensity for prop in regionprops(reg, img)]
             img_save_dir = os.path.join(save_dir, 'outlined')
             cell_den = plot_cell_img(den, thr, fname, img_save_dir, cmax=cmax_i, sb_microns=sb_microns)
-            mi = np.mean(img[thr])
-            if np.isnan(mi):
-                mi = np.mean(img)
-        data = {'fname': fname, 'mean_int': mi, 'num_cells': n}
-        return data, ints
+        return data
     setup_dirs(os.path.join(save_dir, 'subtracted'))
     data = []
-    ints = {}
-    n_imgs = len(list_img_files(img_dir))
-    for imgf in list_img_files(img_dir):
-        print(imgf)
-        data_i, ints_i = img_task(imgf)
-        data.append(data_i)
-        ints[os.path.basename(imgf)] = ints_i
-    df_data = pd.DataFrame(data)
-    df_data.to_csv(os.path.join(save_dir, 'y.csv'), index=True)
-    df_ints = pd.DataFrame.from_dict(ints, orient='index').transpose()
-    df_ints.to_csv(os.path.join(save_dir, 'y_ints.csv'), index=False)
+    data = Parallel(n_jobs=os.cpu_count())(delayed(img_task)(data, imgf) for imgf in list_img_files(img_dir))
+    if segmt:
+        data = list(itertools.chain.from_iterable(data))
+        data = {'y': data}
+    df = pd.DataFrame(data)
+    df.to_csv(os.path.join(save_dir, 'y.csv'), index=True)
+
+
+def combine_before_after(root_dir):
+    df = pd.DataFrame(columns=['group', 'timepoint', 'response'])
+    for tpoint in ['before', 'after']:
+        tp_dir = os.path.join(root_dir, tpoint)
+        for i, data_dir in enumerate(natsorted([x[1] for x in os.walk(tp_dir)][0])):
+            y_csv = os.path.join(tp_dir, data_dir, 'results', 'y.csv')
+            y_data = pd.read_csv(y_csv)
+            rs = y_data['y'].values
+            gr = np.full_like(rs, i+1)
+            tp = np.full_like(rs, tpoint)
+            di = pd.DataFrame(np.column_stack([gr, tp, rs]), columns=['group', 'timepoint', 'response'])
+            df = pd.concat([df, di], ignore_index=True)
+    df.to_csv(os.path.join(root_dir, 'y.csv'), index=False)
+
+
+def plot_before_after(root_dir, group_labels, group_order, figsize=(24, 8), tp_label=['t=0hr', 't=24hr']):
+    df = pd.read_csv(os.path.join(root_dir, 'y.csv'))
+    df = df[df.group.isin(group_order)]
+    df_fc = df.copy()
+    fc_vals = {}
+    for gr in df.group.unique():
+        mean_before = df.loc[(df['group'] == gr) & (df['timepoint'] == 'before'), 'response'].mean()
+        mean_after = df.loc[(df['group'] == gr) & (df['timepoint'] == 'after'), 'response'].mean()
+        fc_vals[gr] = str(round(mean_after/mean_before, 2)) + r'$\times$'
+    palette = ['#B0BEC5', '#1976D2']
+    with plt.style.context(('seaborn-whitegrid', custom_styles)), sns.color_palette(palette):
+        fig, ax = plt.subplots(figsize=figsize)
+        sns.stripplot(x="group", y="response", hue='timepoint', data=df, order=group_order, ax=ax, size=7, linewidth=0, dodge=True, alpha=0.8)
+        sns.pointplot(x="group", y="response", hue='timepoint', data=df, order=group_order, ax=ax, estimator=np.mean, ci=99, join=False, dodge=0.4, markers='.', errwidth=3, capsize=0.1, scale=0.5, color='#212121')
+        for i, gr in enumerate(group_order):
+            y = df.loc[(df['group'] == gr), 'response'].max()
+            m = df.response.max() * 0.05
+            ax.plot([i-0.2, i-0.2, i+0.2, i+0.2], [y+m, y+m*1.5, y+m*1.5, y+m], lw=3, color='#212121')
+            ax.text(i, y+m*2, fc_vals[gr], ha='center', va='bottom', color='#212121', fontsize=20)
+        ax.set_xlabel('')
+        ax.set_ylabel('AU')
+        ax.set_xticklabels(group_labels)
+        ax.tick_params(which='minor', length=8, width=2)
+        ax.tick_params(which='major', length=12, width=4)
+        handles, labels = ax.get_legend_handles_labels()
+        ax.legend(handles, tp_label, loc='best', prop={"size": 20}, frameon=True, shadow=False)
+        fig_name = 'y_' + '-'.join([str(int(g)) for g in df.group.unique()]) + '.png'
+        plt.savefig(os.path.join(root_dir, fig_name), dpi=200, transparent=False, bbox_inches='tight')
+        plt.close()
+
+
+def combine_groups(root_dir, ch):
+    df = pd.DataFrame(columns=['group', 'response'])
+    for i, data_dir in enumerate(natsorted([x[1] for x in os.walk(root_dir)][0], alg=ns.IGNORECASE)):
+        print(i, data_dir)
+        y_csv = os.path.join(root_dir, data_dir, ch + '-results', 'y.csv')
+        y_data = pd.read_csv(y_csv)
+        rs = y_data['y'].values
+        gr = np.full_like(rs, i+1)
+        di = pd.DataFrame(np.column_stack([gr, rs]), columns=['group', 'response'])
+        df = pd.concat([df, di], ignore_index=True)
+    df.to_csv(os.path.join(root_dir, 'y.csv'), index=False)
+
+
+def plot_groups(root_dir, group_labels, group_order, figsize=(16, 8), hist=False):
+    df = pd.read_csv(os.path.join(root_dir, 'y.csv'))
+    df = df[df.group.isin(group_order)]
+    with plt.style.context(('seaborn-whitegrid', custom_styles)), sns.color_palette(custom_palette):
+        fig, ax = plt.subplots(figsize=figsize)
+        if hist:
+            g = sns.histplot(data=df, ax=ax, x='response', hue='group', common_bins=True, log_scale=False, linewidth=0.2, alpha=0.8, palette=ListedColormap(custom_palette))
+            ax.set_xlabel('Fluorescence (AU)')
+            ax.set_ylabel('Count')
+            g.legend_.set_title(None)
+            ax.legend(group_labels, loc='best', prop={"size": 24}, frameon=True, shadow=False)
+        else:
+            sns.stripplot(x="group", y="response", data=df, order=group_order, ax=ax, size=7, linewidth=0, dodge=True, alpha=0.8)
+            sns.pointplot(x="group", y="response", data=df, order=group_order, ax=ax, estimator=np.mean, ci=99, join=False, dodge=0.4, markers='.', errwidth=3, capsize=0.1, scale=0.5, color='#212121')
+            ax.set_xlabel('')
+            ax.set_xticklabels(group_labels)
+            ax.set_ylabel('AU')
+            ax.tick_params(which='minor', length=8, width=2)
+            ax.tick_params(which='major', length=12, width=4)
+        fig_name = 'y_' + '-'.join([str(int(g)) for g in df.group.unique()]) + '.png'
+        plt.savefig(os.path.join(root_dir, fig_name), dpi=200, transparent=False, bbox_inches='tight')
+        plt.close()
 
 
 if __name__ == '__main__':
-    ## File Structure ##
-    # --Root_Dir
-    # ----Imgs_Dir
-    #-------img1.tif (can be named whatever)
-    #-------img2.tif
+    ## Set Parameters ##
+    root_dir = '/home/phuong/data/FPs/Lenti/20220403/'
+    img_folder = 'mCherry' # (e.g. Default, DIC, GFP, etc. Make sure they're named the same for between group folders)
+    group_labels = [  # x-axis label for each group. '\n' = newline
+        'HEK293T',
+        'L929',
+    ]
+    group_order = [1, 2] # Order to plot each group on axis
+    sb_microns = 110  # [float] Specify scalebar label in microns or None for no scalebar
+    cmax = None  # [float] Colorbar upper limit value. Leave None to auto calculate.
+    segmt = True  # [bool] Whether to perform object segmentation and calculate mean intensity of only pixels in those regions or don't and calculate it using every pixel in the whole image
+    segmt_local = True  # [bool] Whether to use local thresholding or global thresholding for the segmentation
+    segmt_factor = 1  # [float] Tune the thresholding. Higher => exclude dimmer regions | Lower => include dimmer regions
+    remove_small = 100  # [int] Excludes regions smaller than the specified area in pixels squared
+    before_after = False  # [bool] Set True if "before-after" images for each group were taken.
+    
+    ## General File Structure ##
+    #-Root_Dir
+    #---Group_Dir
+    #-----Imgs_Dir/Channel_Dir
+    #-------1.tif (can be named whatever)
+    #-------2.tif
     #-------...etc...
-    # ----Results_Dir (will be generated by this script)
+    #-----Results_Dir (will be generated by this script)
     #-------debug (for checking background subtraction; blue = img | orange = bkg)
     #-------subtracted (tif images with background subtracted)
     #-------denoised (bkg subtracted + denoising algorithm applied)
     #-------outlined (denoised image with object segmentation regions outlined in white)
     #-------y.csv (data extracted from image)
-    root_dir = '/home/phuong/data/myra/20220328/20220328_12TetO-mScl-CellLine_TetR-VPR_TxRed/'
-    img_folder = 'Default'
 
-    ## Parameters ##
-    sb_microns = 110  # [float] specify scalebar label in microns or None for no scalebar
-    cmax = None  # [float] Colorbar upper limit value. Leave None to auto calculate.
-    segmt = True  # [bool] Whether to perform object segmentation and calculate mean intensity of only pixels in those regions or don't and calculate it using every pixel in the whole image
-    segmt_local = True  # [bool] Whether to use local thresholding or global thresholding for the segmentation
-    segmt_factor = 0.5  # [float] Tune the thresholding. Higher => exclude dimmer regions | Lower => include dimmer regions
-    remove_small = 100  # [int] Excludes regions smaller than the specified area in pixels squared
+    #### Comparison of Groups ##
+    ## File Structure if before_after = False ##
+    #---Root_Dir
+    #-----group1 # (can be named whatever)
+    #-------channel1 # (e.g. Default, DIC, GFP, etc. Make sure they're named the same for between group folders)
+    #---------1.tif (can be named whatever)
+    #---------2.tif
+    #---------...etc...
+    #-------channel2
+    #---------1.tif (can be named whatever)
+    #---------2.tif
+    #---------...etc...
+    #-----group2 # can be named whatever
+    #-------channel1
+    #---------1.tif
+    #---------2.tif
+    #---------...etc...
+    #-------channel2
+    #---------1.tif
+    #---------2.tif
+    #---------...etc...
+    if not before_after:
+        for group_dir in natsorted(os.listdir(root_dir)):
+            if group_dir == ".directory" or os.path.isfile(os.path.join(root_dir, group_dir)):
+                continue
+            print(group_dir)
+            img_dir = os.path.join(root_dir, group_dir, img_folder)
+            save_dir = os.path.join(root_dir, group_dir, img_folder + '-results')
+            process_fluo_images(img_dir, save_dir, sb_microns=sb_microns, cmax=cmax,
+                segmt=segmt, segmt_local=segmt_local, segmt_factor=segmt_factor, remove_small=remove_small)
 
-    img_dir = os.path.join(root_dir, img_folder)
-    save_dir = os.path.join(root_dir, img_folder + '-results')
-    process_fluo_images(img_dir, save_dir, sb_microns=sb_microns, cmax=cmax,
-        segmt=segmt, segmt_local=segmt_local, segmt_factor=segmt_factor, remove_small=remove_small)
+        combine_groups(root_dir, img_folder)
+        plot_groups(root_dir, group_labels=group_labels, group_order=group_order, figsize=(len(group_labels)*6, 8), hist=segmt)
+
+
+    #### Before-After Fold Change ##
+    ## File Structure if before_after = True ##
+    #---Root_Dir
+    #-----before # has to be a folder named "before"
+    #-------group1 # (can be named whatever. Make sure they're named the same between before/after folders)
+    #---------1.tif (can be named whatever)
+    #---------2.tif
+    #---------...etc...
+    #-------group2
+    #---------1.tif
+    #---------2.tif
+    #---------...etc...
+    #-----after # has to be a folder named "after"
+    #-------group1
+    #---------1.tif
+    #---------2.tif
+    #---------...etc...
+    #-------group2
+    #---------1.tif
+    #---------2.tif
+    #---------...etc...
+    else:
+        for t in ['before', 'after']:
+            tp_dir = os.path.join(root_dir, t)
+            for group_dir in natsorted(os.listdir(tp_dir)):
+                if group_dir == ".directory":
+                    continue
+                print(group_dir)
+                img_dir = os.path.join(tp_dir, group_dir, img_folder)
+                save_dir = os.path.join(tp_dir, group_dir, 'results')
+                process_fluo_images(img_dir, save_dir, sb_microns=sb_microns, cmax=cmax,
+                    segmt=segmt, segmt_local=segmt_local, segmt_factor=segmt_factor, remove_small=remove_small)
+        combine_before_after(root_dir)
+        plot_before_after(root_dir, group_labels, group_order=group_order, figsize=(len(group_labels)*6, 8))
+
+
