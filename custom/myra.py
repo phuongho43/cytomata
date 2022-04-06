@@ -154,104 +154,69 @@ def segment_object(img, local=False, factor=1, rs=None):
 def process_fluo_images(img_dir, save_dir, sb_microns=11, cmax=None,
     segmt=False, segmt_local=False, segmt_factor=1, remove_small=None):
     """Analyze fluorescence 10x images and generate figures."""
-    def img_task(data, i, imgf):
-        fname = str(i)
+    def img_task(data, imgf):
+        fname = os.path.splitext(os.path.basename(imgf))[0]
         img, raw, bkg, den = preprocess_img(imgf)
-        cmax_i = cmax
-        if cmax is None:
-            cmax_i = np.percentile(img, 99.99)
         plot_bkg_profile(fname, save_dir, raw, bkg)
-        thr = None
-        mi = np.mean(img)
-        n = 0
         img_path = os.path.join(save_dir, 'subtracted', fname + '.tiff')
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             imsave(img_path, img_as_uint(rescale_intensity(img)))
+        cmax_i = cmax
+        if cmax is None:
+            cmax_i = np.percentile(img, 99.99)
         img_save_dir = os.path.join(save_dir, 'denoised')
         cell_den = plot_cell_img(den, None, fname, img_save_dir, cmax=cmax_i, sb_microns=sb_microns)
+        mi = np.mean(img)
+        data = {'i': fname, 'y': mi}
         if segmt:
-            thr, reg, n = segment_object(den, local=segmt_local, factor=segmt_factor, rs=remove_small)
+            thr, reg, n = segment_object(den, segmt_local=segmt_local, factor=segmt_factor, rs=remove_small)
+            data = [prop.mean_intensity for prop in regionprops(reg, img)]
             img_save_dir = os.path.join(save_dir, 'outlined')
             cell_den = plot_cell_img(den, thr, fname, img_save_dir, cmax=cmax_i, sb_microns=sb_microns)
-            mi = np.mean(img[thr])
-            if np.isnan(mi):
-                mi = np.mean(img)
-        data = {'fname': fname, 'mean_int': mi, 'num_cells': n}
         return data
     setup_dirs(os.path.join(save_dir, 'subtracted'))
     data = []
-    # for i, imgf in enumerate(list_img_files(img_dir)):
-    #     data = img_task(data, i, imgf)
-    #     print(i)
-    data = Parallel(n_jobs=os.cpu_count())(delayed(img_task)(data, i, imgf) for i, imgf in enumerate(list_img_files(img_dir)))
+    data = Parallel(n_jobs=os.cpu_count())(delayed(img_task)(data, imgf) for imgf in list_img_files(img_dir))
+    if segmt:
+        data = list(itertools.chain.from_iterable(data))
+        data = {'y': data}
     df = pd.DataFrame(data)
-    df.to_csv(os.path.join(save_dir, 'y.csv'), index=False)
-
-
-def combine_groups(root_dir, ch):
-    df = pd.DataFrame(columns=['Group', 'Response'])
-    for i, data_dir in enumerate(natsorted([x[1] for x in os.walk(root_dir)][0], alg=ns.IGNORECASE)):
-        print(i, data_dir)
-        y_csv = os.path.join(root_dir, data_dir, ch + '-results', 'y.csv')
-        y_data = pd.read_csv(y_csv)
-        rs = y_data['mean_int'].values
-        gr = np.full_like(rs, i+1)
-        di = pd.DataFrame(np.column_stack([gr, rs]), columns=['Group', 'Response'])
-        df = pd.concat([df, di], ignore_index=True)
-        # df = df.append(di, ignore_index=True)
-    df.to_csv(os.path.join(root_dir, 'y.csv'), index=False)
-
-
-def plot_groups(root_dir, group_labels, group_order, figsize=(16, 8)):
-    df = pd.read_csv(os.path.join(root_dir, 'y.csv'))
-    df = df[df.Group.isin(group_order)]
-    with plt.style.context(('seaborn-whitegrid', custom_styles)), sns.color_palette(custom_palette):
-        fig, ax = plt.subplots(figsize=figsize)
-        sns.stripplot(x="Group", y="Response", data=df, order=group_order, ax=ax, size=7, linewidth=0, dodge=True, alpha=0.8)
-        sns.pointplot(x="Group", y="Response", data=df, order=group_order, ax=ax, estimator=np.mean, ci=99, join=False, dodge=0.4, markers='.', errwidth=3, capsize=0.1, scale=0.5, color='#212121')
-        ax.set_xlabel('')
-        ax.set_xticklabels(group_labels)
-        ax.set_ylabel('AU')
-        ax.tick_params(which='minor', length=8, width=2)
-        ax.tick_params(which='major', length=12, width=4)
-        fig_name = 'y_' + '-'.join([str(int(g)) for g in df.Group.unique()]) + '.png'
-        plt.savefig(os.path.join(root_dir, fig_name), dpi=200, transparent=False, bbox_inches='tight')
-        plt.close()
+    df.to_csv(os.path.join(save_dir, 'y.csv'), index=True)
 
 
 def combine_before_after(root_dir):
-    df = pd.DataFrame(columns=['Group', 'Timepoint', 'Response'])
+    df = pd.DataFrame(columns=['group', 'timepoint', 'response'])
     for tpoint in ['before', 'after']:
         tp_dir = os.path.join(root_dir, tpoint)
         for i, data_dir in enumerate(natsorted([x[1] for x in os.walk(tp_dir)][0])):
             y_csv = os.path.join(tp_dir, data_dir, 'results', 'y.csv')
             y_data = pd.read_csv(y_csv)
-            rs = y_data['mean_int'].values
+            rs = y_data['y'].values
             gr = np.full_like(rs, i+1)
             tp = np.full_like(rs, tpoint)
-            di = pd.DataFrame(np.column_stack([gr, tp, rs]), columns=['Group', 'Timepoint', 'Response'])
+            di = pd.DataFrame(np.column_stack([gr, tp, rs]), columns=['group', 'timepoint', 'response'])
             df = pd.concat([df, di], ignore_index=True)
     df.to_csv(os.path.join(root_dir, 'y.csv'), index=False)
 
 
-def plot_before_after(root_dir, group_labels, group_order, figsize=(24, 8)):
+def plot_before_after(root_dir, group_labels, group_order, figsize=(24, 8), tp_label=['t=0hr', 't=24hr']):
     df = pd.read_csv(os.path.join(root_dir, 'y.csv'))
-    df = df[df.Group.isin(group_order)]
+    df = df[df.group.isin(group_order)]
     df_fc = df.copy()
     fc_vals = {}
-    for gr in df.Group.unique():
-        mean_before = df.loc[(df['Group'] == gr) & (df['Timepoint'] == 'before'), 'Response'].mean()
-        mean_after = df.loc[(df['Group'] == gr) & (df['Timepoint'] == 'after'), 'Response'].mean()
+    for gr in df.group.unique():
+        mean_before = df.loc[(df['group'] == gr) & (df['timepoint'] == 'before'), 'response'].mean()
+        mean_after = df.loc[(df['group'] == gr) & (df['timepoint'] == 'after'), 'response'].mean()
         fc_vals[gr] = str(round(mean_after/mean_before, 2)) + r'$\times$'
     palette = ['#B0BEC5', '#1976D2']
     with plt.style.context(('seaborn-whitegrid', custom_styles)), sns.color_palette(palette):
         fig, ax = plt.subplots(figsize=figsize)
-        sns.stripplot(x="Group", y="Response", hue='Timepoint', data=df, order=group_order, ax=ax, size=7, linewidth=0, dodge=True, alpha=0.8)
-        sns.pointplot(x="Group", y="Response", hue='Timepoint', data=df, order=group_order, ax=ax, estimator=np.mean, ci=99, join=False, dodge=0.4, markers='.', errwidth=3, capsize=0.1, scale=0.5, color='#212121')
+        sns.stripplot(x="group", y="response", hue='timepoint', data=df, order=group_order, ax=ax, size=7, linewidth=0, dodge=True, alpha=0.8)
+        sns.pointplot(x="group", y="response", hue='timepoint', data=df, order=group_order, ax=ax, estimator=np.mean, ci=99, join=False, dodge=0.4, markers='.', errwidth=3, capsize=0.1, scale=0.5, color='#212121')
         for i, gr in enumerate(group_order):
-            y = df.loc[(df['Group'] == gr), 'Response'].max()
-            m = df.Response.max() * 0.05
+            y = df.loc[(df['group'] == gr), 'response'].max()
+            m = df.response.max() * 0.05
             ax.plot([i-0.2, i-0.2, i+0.2, i+0.2], [y+m, y+m*1.5, y+m*1.5, y+m], lw=3, color='#212121')
             ax.text(i, y+m*2, fc_vals[gr], ha='center', va='bottom', color='#212121', fontsize=20)
         ax.set_xlabel('')
@@ -260,8 +225,45 @@ def plot_before_after(root_dir, group_labels, group_order, figsize=(24, 8)):
         ax.tick_params(which='minor', length=8, width=2)
         ax.tick_params(which='major', length=12, width=4)
         handles, labels = ax.get_legend_handles_labels()
-        ax.legend(handles, ['before', 'after'], loc='best', prop={"size": 20}, frameon=True, shadow=False)
-        fig_name = 'y_' + '-'.join([str(int(g)) for g in df.Group.unique()]) + '.png'
+        ax.legend(handles, tp_label, loc='best', prop={"size": 20}, frameon=True, shadow=False)
+        fig_name = 'y_' + '-'.join([str(int(g)) for g in df.group.unique()]) + '.png'
+        plt.savefig(os.path.join(root_dir, fig_name), dpi=200, transparent=False, bbox_inches='tight')
+        plt.close()
+
+
+def combine_groups(root_dir, ch):
+    df = pd.DataFrame(columns=['group', 'response'])
+    for i, data_dir in enumerate(natsorted([x[1] for x in os.walk(root_dir)][0], alg=ns.IGNORECASE)):
+        print(i, data_dir)
+        y_csv = os.path.join(root_dir, data_dir, ch + '-results', 'y.csv')
+        y_data = pd.read_csv(y_csv)
+        rs = y_data['y'].values
+        gr = np.full_like(rs, i+1)
+        di = pd.DataFrame(np.column_stack([gr, rs]), columns=['group', 'response'])
+        df = pd.concat([df, di], ignore_index=True)
+    df.to_csv(os.path.join(root_dir, 'y.csv'), index=False)
+
+
+def plot_groups(root_dir, group_labels, group_order, figsize=(16, 8), hist=False):
+    df = pd.read_csv(os.path.join(root_dir, 'y.csv'))
+    df = df[df.group.isin(group_order)]
+    with plt.style.context(('seaborn-whitegrid', custom_styles)), sns.color_palette(custom_palette):
+        fig, ax = plt.subplots(figsize=figsize)
+        if hist:
+            g = sns.histplot(data=df, ax=ax, x='response', hue='group', common_bins=True, log_scale=False, linewidth=0.2, alpha=0.8, palette=ListedColormap(custom_palette))
+            ax.set_xlabel('Fluorescence (AU)')
+            ax.set_ylabel('Count')
+            g.legend_.set_title(None)
+            ax.legend(group_labels, loc='best', prop={"size": 24}, frameon=True, shadow=False)
+        else:
+            sns.stripplot(x="group", y="response", data=df, order=group_order, ax=ax, size=7, linewidth=0, dodge=True, alpha=0.8)
+            sns.pointplot(x="group", y="response", data=df, order=group_order, ax=ax, estimator=np.mean, ci=99, join=False, dodge=0.4, markers='.', errwidth=3, capsize=0.1, scale=0.5, color='#212121')
+            ax.set_xlabel('')
+            ax.set_xticklabels(group_labels)
+            ax.set_ylabel('AU')
+            ax.tick_params(which='minor', length=8, width=2)
+            ax.tick_params(which='major', length=12, width=4)
+        fig_name = 'y_' + '-'.join([str(int(g)) for g in df.group.unique()]) + '.png'
         plt.savefig(os.path.join(root_dir, fig_name), dpi=200, transparent=False, bbox_inches='tight')
         plt.close()
 
@@ -317,17 +319,18 @@ if __name__ == '__main__':
     #---------1.tif
     #---------2.tif
     #---------...etc...
-    for group_dir in natsorted(os.listdir(root_dir)):
-        if group_dir == ".directory":
-            continue
-        print(group_dir)
-        img_dir = os.path.join(root_dir, group_dir, img_folder)
-        save_dir = os.path.join(root_dir, group_dir, img_folder + '-results')
-        process_fluo_images(img_dir, save_dir, sb_microns=sb_microns, cmax=cmax,
-            segmt=segmt, segmt_local=segmt_local, segmt_factor=segmt_factor, remove_small=remove_small)
+    if not before_after:
+        for group_dir in natsorted(os.listdir(root_dir)):
+            if group_dir == ".directory" or os.path.isfile(os.path.join(root_dir, group_dir)):
+                continue
+            print(group_dir)
+            img_dir = os.path.join(root_dir, group_dir, img_folder)
+            save_dir = os.path.join(root_dir, group_dir, img_folder + '-results')
+            process_fluo_images(img_dir, save_dir, sb_microns=sb_microns, cmax=cmax,
+                segmt=segmt, segmt_local=segmt_local, segmt_factor=segmt_factor, remove_small=remove_small)
 
-    combine_groups(root_dir, img_folder)
-    plot_groups(root_dir, group_labels, group_order=group_order, figsize=(len(group_labels)*6, 8))
+        combine_groups(root_dir, img_folder)
+        plot_groups(root_dir, group_labels=group_labels, group_order=group_order, figsize=(len(group_labels)*6, 8), hist=segmt)
 
 
     #### Before-After Fold Change ##
@@ -351,17 +354,18 @@ if __name__ == '__main__':
     #---------1.tif
     #---------2.tif
     #---------...etc...
-    # for t in ['before', 'after']:
-    #     tp_dir = os.path.join(root_dir, t)
-    #     for group_dir in natsorted(os.listdir(tp_dir)):
-    #         if group_dir == ".directory":
-    #             continue
-    #         print(group_dir)
-    #         img_dir = os.path.join(tp_dir, group_dir, img_folder)
-    #         save_dir = os.path.join(tp_dir, group_dir, 'results')
-    #         process_fluo_images(img_dir, save_dir, sb_microns=sb_microns, cmax=cmax,
-    #             segmt=segmt, segmt_local=segmt_local, segmt_factor=segmt_factor, remove_small=remove_small)
-    # combine_before_after(root_dir)
-    # plot_before_after(root_dir, group_labels, group_order=group_order, figsize=(len(group_labels)*6, 8))
+    else:
+        for t in ['before', 'after']:
+            tp_dir = os.path.join(root_dir, t)
+            for group_dir in natsorted(os.listdir(tp_dir)):
+                if group_dir == ".directory":
+                    continue
+                print(group_dir)
+                img_dir = os.path.join(tp_dir, group_dir, img_folder)
+                save_dir = os.path.join(tp_dir, group_dir, 'results')
+                process_fluo_images(img_dir, save_dir, sb_microns=sb_microns, cmax=cmax,
+                    segmt=segmt, segmt_local=segmt_local, segmt_factor=segmt_factor, remove_small=remove_small)
+        combine_before_after(root_dir)
+        plot_before_after(root_dir, group_labels, group_order=group_order, figsize=(len(group_labels)*6, 8))
 
 

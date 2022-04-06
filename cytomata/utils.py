@@ -3,7 +3,7 @@ import imghdr
 from natsort import natsorted
 
 
-custom_palette = ['#648FFF', '#DC267F', '#785EF0', '#FE6100', '#FFB000']
+custom_palette = ['#648FFF', '#DC267F', '#FE6100', '#FFB000', '#785EF0']
 
 
 custom_styles = {
@@ -21,9 +21,9 @@ custom_styles = {
     'axes.labelweight': 600,
     'axes.linewidth': 3,
     'axes.edgecolor': '#212121',
-    'xtick.labelsize': 36,
-    'ytick.labelsize': 36,
-    'legend.fontsize': 36,
+    'xtick.labelsize': 32,
+    'ytick.labelsize': 32,
+    'legend.fontsize': 32,
     'lines.linewidth': 5
 }
 
