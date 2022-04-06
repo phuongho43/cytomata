@@ -9,7 +9,7 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-from natsort import natsorted
+from natsort import natsorted, ns
 from scipy import ndimage as ndi
 
 from matplotlib import font_manager
@@ -180,7 +180,6 @@ def process_fluo_images(img_dir, save_dir, sb_microns=11, cmax=None,
         data = {'fname': fname, 'mean_int': mi, 'num_cells': n}
         return data
     setup_dirs(os.path.join(save_dir, 'subtracted'))
-    ta = time.time()
     data = []
     # for i, imgf in enumerate(list_img_files(img_dir)):
     #     data = img_task(data, i, imgf)
@@ -188,7 +187,6 @@ def process_fluo_images(img_dir, save_dir, sb_microns=11, cmax=None,
     data = Parallel(n_jobs=os.cpu_count())(delayed(img_task)(data, i, imgf) for i, imgf in enumerate(list_img_files(img_dir)))
     df = pd.DataFrame(data)
     df.to_csv(os.path.join(save_dir, 'y.csv'), index=False)
-    print(time.time() - ta)
 
 
 def combine_groups(root_dir, ch):
@@ -197,10 +195,11 @@ def combine_groups(root_dir, ch):
         print(i, data_dir)
         y_csv = os.path.join(root_dir, data_dir, ch + '-results', 'y.csv')
         y_data = pd.read_csv(y_csv)
-        rs = y_data['y'].values
+        rs = y_data['mean_int'].values
         gr = np.full_like(rs, i+1)
         di = pd.DataFrame(np.column_stack([gr, rs]), columns=['Group', 'Response'])
-        df = df.append(di, ignore_index=True)
+        df = pd.concat([df, di], ignore_index=True)
+        # df = df.append(di, ignore_index=True)
     df.to_csv(os.path.join(root_dir, 'y.csv'), index=False)
 
 
@@ -269,15 +268,13 @@ def plot_before_after(root_dir, group_labels, group_order, figsize=(24, 8)):
 
 if __name__ == '__main__':
     ## Set Parameters ##
-    root_dir = '/home/phuong/data/myra/20220328/'
-    img_folder = 'Default' # (e.g. Default, DIC, GFP, etc. Make sure they're named the same for between group folders)
-    group_labels = [  # Name for each group (doesn't have to be same as the folder names)
-        '12TetO-mScI CL\nTetR-VPR',
-        '12TetO-mScI\nFUSN-mTq2-M12-VPR',
-        '12TetO-mScI\nTetR-mGd-CaM-FUSN'
-        '12TetO-mScI\nFUSN-mTq2-M12-VPR\nTetR-mGd-CaM-FUSN'
+    root_dir = '/home/phuong/data/FPs/Lenti/20220403/'
+    img_folder = 'mCherry' # (e.g. Default, DIC, GFP, etc. Make sure they're named the same for between group folders)
+    group_labels = [  # x-axis label for each group. '\n' = newline
+        'HEK293T',
+        'L929',
     ]
-    group_order = [1, 2, 3, 4] # Order to plot each group in the bargraph
+    group_order = [1, 2] # Order to plot each group on the bargraph
     sb_microns = 110  # [float] Specify scalebar label in microns or None for no scalebar
     cmax = None  # [float] Colorbar upper limit value. Leave None to auto calculate.
     segmt = True  # [bool] Whether to perform object segmentation and calculate mean intensity of only pixels in those regions or don't and calculate it using every pixel in the whole image
@@ -285,6 +282,7 @@ if __name__ == '__main__':
     segmt_factor = 1  # [float] Tune the thresholding. Higher => exclude dimmer regions | Lower => include dimmer regions
     remove_small = 100  # [int] Excludes regions smaller than the specified area in pixels squared
     before_after = False  # [bool] Set True if "before-after" images for each group were taken.
+    
     ## General File Structure ##
     #---Group_Dir
     #-----Imgs_Dir/Channel_Dir
@@ -298,6 +296,7 @@ if __name__ == '__main__':
     #-------outlined (denoised image with object segmentation regions outlined in white)
     #-------y.csv (data extracted from image)
 
+    #### Comparison of Groups ##
     ## File Structure if before_after = False ##
     #---Root_Dir
     #-----group1 # (can be named whatever)
@@ -318,7 +317,20 @@ if __name__ == '__main__':
     #---------1.tif
     #---------2.tif
     #---------...etc...
+    for group_dir in natsorted(os.listdir(root_dir)):
+        if group_dir == ".directory":
+            continue
+        print(group_dir)
+        img_dir = os.path.join(root_dir, group_dir, img_folder)
+        save_dir = os.path.join(root_dir, group_dir, img_folder + '-results')
+        process_fluo_images(img_dir, save_dir, sb_microns=sb_microns, cmax=cmax,
+            segmt=segmt, segmt_local=segmt_local, segmt_factor=segmt_factor, remove_small=remove_small)
 
+    combine_groups(root_dir, img_folder)
+    plot_groups(root_dir, group_labels, group_order=group_order, figsize=(len(group_labels)*6, 8))
+
+
+    #### Before-After Fold Change ##
     ## File Structure if before_after = True ##
     #---Root_Dir
     #-----before # has to be a folder named "before"
@@ -339,19 +351,6 @@ if __name__ == '__main__':
     #---------1.tif
     #---------2.tif
     #---------...etc...
-
-    ## Process Images ##
-    #### Comparison of Groups ##
-    for group_dir in natsorted(os.listdir(root_dir)):
-        if group_dir == ".directory":
-            continue
-        print(group_dir)
-        img_dir = os.path.join(root_dir, group_dir, img_folder)
-        save_dir = os.path.join(root_dir, group_dir, 'results')
-        process_fluo_images(img_dir, save_dir, sb_microns=sb_microns, cmax=cmax,
-            segmt=segmt, segmt_local=segmt_local, segmt_factor=segmt_factor, remove_small=remove_small)
-
-    #### Before-After Fold Change ##
     # for t in ['before', 'after']:
     #     tp_dir = os.path.join(root_dir, t)
     #     for group_dir in natsorted(os.listdir(tp_dir)):
@@ -362,13 +361,7 @@ if __name__ == '__main__':
     #         save_dir = os.path.join(tp_dir, group_dir, 'results')
     #         process_fluo_images(img_dir, save_dir, sb_microns=sb_microns, cmax=cmax,
     #             segmt=segmt, segmt_local=segmt_local, segmt_factor=segmt_factor, remove_small=remove_small)
-
-
-    ## Generate Plots ##
-    ### Comparison of Groups ##
-    combine_groups(root_dir, img_folder)
-    plot_groups(root_dir, group_labels, group_order=group_order, figsize=(len(group_labels)*6, 8))
-
-    #### Before-After Fold Change ##
     # combine_before_after(root_dir)
     # plot_before_after(root_dir, group_labels, group_order=group_order, figsize=(len(group_labels)*6, 8))
+
+
