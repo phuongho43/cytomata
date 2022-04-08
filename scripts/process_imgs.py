@@ -17,6 +17,7 @@ from skimage.io import imsave
 from skimage.exposure import rescale_intensity
 from skimage.measure import regionprops
 from matplotlib.colors import ListedColormap
+import matplotlib as mpl
 
 from cytomata.plot import plot_cell_img, plot_bkg_profile
 from cytomata.process import preprocess_img, segment_object
@@ -120,9 +121,10 @@ def plot_groups(root_dir, group_labels, group_order, figsize=(16, 8), hist=False
     df = pd.read_csv(os.path.join(root_dir, 'y.csv'))
     df = df[df.group.isin(group_order)]
     with plt.style.context(('seaborn-whitegrid', custom_styles)), sns.color_palette(custom_palette):
+        mpl.colormaps.register(cmap=ListedColormap(custom_palette), name='custom')
         fig, ax = plt.subplots(figsize=figsize)
         if hist:
-            g = sns.histplot(data=df, ax=ax, x='response', hue='group', common_bins=True, log_scale=False, linewidth=0.2, alpha=0.5, palette=ListedColormap(custom_palette))
+            g = sns.histplot(data=df, ax=ax, x='response', hue='group', common_bins=True, log_scale=False, linewidth=0.2, alpha=0.5, palette='custom')
             ax.set_xlabel('Fluorescence (AU)')
             ax.set_ylabel('Count')
             g.legend_.set_title(None)
@@ -175,14 +177,14 @@ if __name__ == '__main__':
 
     if not before_after:
     #### Comparison of Groups ##
-        for group_dir in natsorted(os.listdir(root_dir)):
-            if group_dir == ".directory" or os.path.isfile(os.path.join(root_dir, group_dir)):
-                continue
-            print(group_dir)
-            img_dir = os.path.join(root_dir, group_dir, img_folder)
-            save_dir = os.path.join(root_dir, group_dir, img_folder + '-results')
-            process_fluo_images(img_dir, save_dir, sb_microns=sb_microns, cmax=cmax,
-                segmt=segmt, segmt_local=segmt_local, segmt_factor=segmt_factor, remove_small=remove_small)
+        # for group_dir in natsorted(os.listdir(root_dir)):
+        #     if group_dir == ".directory" or os.path.isfile(os.path.join(root_dir, group_dir)):
+        #         continue
+        #     print(group_dir)
+        #     img_dir = os.path.join(root_dir, group_dir, img_folder)
+        #     save_dir = os.path.join(root_dir, group_dir, img_folder + '-results')
+        #     process_fluo_images(img_dir, save_dir, sb_microns=sb_microns, cmax=cmax,
+        #         segmt=segmt, segmt_local=segmt_local, segmt_factor=segmt_factor, remove_small=remove_small)
         combine_groups(root_dir, img_folder)
         plot_groups(root_dir, group_labels=group_labels, group_order=group_order, figsize=(len(group_labels)*8, 8), hist=segmt)
 
