@@ -24,25 +24,20 @@ from cytomata.process import preprocess_img, segment_object
 from cytomata.utils import setup_dirs, list_img_files, custom_styles, custom_palette
 
 
-def process_fluo_images(img_dir, save_dir, sb_microns=11,
-    cmax=None, segmt_local=False, segmt_factor=1, remove_small=None):
+def process_fluo_images(img_dir, save_dir, sb_microns=11, cmax=None):
     """Analyze fluorescence 10x images and generate figures."""
     def img_task(data, imgf):
         fname = os.path.splitext(os.path.basename(imgf))[0]
         img, raw, bkg, den = preprocess_img(imgf)
-        thr, reg, n = segment_object(den, segmt_local=segmt_local, factor=segmt_factor, rs=remove_small)
         cmax_i = cmax
         if cmax is None:
             cmax_i = np.percentile(img, 99.99)
         plot_bkg_profile(fname, save_dir, raw, bkg)
+        plot_cell_img(den, None, fname, os.path.join(save_dir, 'denoised'), cmax=cmax_i, sb_microns=sb_microns)
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             imsave(os.path.join(save_dir, 'subtracted', fname + '.tiff'), img_as_uint(rescale_intensity(img)))
-        plot_cell_img(den, None, fname, os.path.join(save_dir, 'denoised'), cmax=cmax_i, sb_microns=sb_microns)
-        plot_cell_img(den, thr, fname, os.path.join(save_dir, 'outlined'), cmax=cmax_i, sb_microns=sb_microns)
-        y = np.mean(img[thr])
-        if np.isnan(y):
-            np.mean(img)
+        y = np.mean(img)
         data = {'i': fname, 'y': y}
         return data
     setup_dirs(os.path.join(save_dir, 'subtracted'))
@@ -75,7 +70,7 @@ def plot_groups(root_dir, group_labels, group_order, figsize=(16, 8)):
         sns.pointplot(x="group", y="response", data=df, order=group_order, ax=ax, estimator=np.mean, ci=99, join=False, dodge=0.4, markers='.', errwidth=3, capsize=0.1, scale=0.5, color='#212121', zorder=1)
         ax.set_xlabel('')
         ax.set_xticklabels(group_labels)
-        ax.set_ylabel('AU')
+        ax.set_ylabel('Fluorescence (AU)')
         ax.tick_params(which='minor', length=8, width=2)
         ax.tick_params(which='major', length=12, width=4)
         fig_name = 'y_' + '-'.join([str(int(g)) for g in df.group.unique()]) + '.png'
@@ -118,7 +113,7 @@ def plot_before_after(root_dir, group_labels, group_order, figsize=(24, 8), tp_l
             ax.plot([i-0.2, i-0.2, i+0.2, i+0.2], [y+m, y+m*1.5, y+m*1.5, y+m], lw=3, color='#212121')
             ax.text(i, y+m*2, fc_vals[gr], ha='center', va='bottom', color='#212121', fontsize=20)
         ax.set_xlabel('')
-        ax.set_ylabel('AU')
+        ax.set_ylabel('Fluorescence (AU)')
         ax.set_xticklabels(group_labels)
         ax.tick_params(which='minor', length=8, width=2)
         ax.tick_params(which='major', length=12, width=4)
@@ -131,19 +126,17 @@ def plot_before_after(root_dir, group_labels, group_order, figsize=(24, 8), tp_l
 
 if __name__ == '__main__':
     ## Set Parameters ##
-    root_dir = '/home/phuong/data/GEX/20220409/'
-    img_folder = 'TxRed'
+    root_dir = '/home/phuong/data/GEX/20220414/'
+    img_folder = 'GFP'
     group_labels = [
-        'TetO',
-        # 'L929'
+        'Reporter\n+ CD19-SN\n(Day 0)',
+        'Reporter\n+ CD19-SN\n(Day 1)',
+        'Reporter\n+ CD19-SN\n+ CD19-antigen\n(Day 1)',
     ]
-    group_order = [1]
+    group_order = [3, 4, 5]
     sb_microns = 110
     cmax = None
-    segmt_local = True
-    segmt_factor = 1
-    remove_small = 100
-    before_after = True
+    before_after = False
     
 
     if not before_after:
@@ -154,10 +147,9 @@ if __name__ == '__main__':
             print(group_dir)
             img_dir = os.path.join(root_dir, group_dir, img_folder)
             save_dir = os.path.join(root_dir, group_dir, img_folder + '-results')
-            process_fluo_images(img_dir, save_dir, sb_microns=sb_microns, cmax=cmax,
-                segmt_local=segmt_local, segmt_factor=segmt_factor, remove_small=remove_small)
-        combine_groups(root_dir, img_folder)
-        plot_groups(root_dir, group_labels=group_labels, group_order=group_order, figsize=(len(group_labels)*8, 8))
+            process_fluo_images(img_dir, save_dir, sb_microns=sb_microns, cmax=cmax)
+        # combine_groups(root_dir, img_folder)
+        # plot_groups(root_dir, group_labels=group_labels, group_order=group_order, figsize=(len(group_labels)*8, 8))
 
     else:
     #### Before-After Fold Change ##
@@ -169,7 +161,6 @@ if __name__ == '__main__':
                 print(group_dir)
                 img_dir = os.path.join(tp_dir, group_dir, img_folder)
                 save_dir = os.path.join(tp_dir, group_dir, img_folder + '-results')
-                process_fluo_images(img_dir, save_dir, sb_microns=sb_microns, cmax=cmax,
-                    segmt_local=segmt_local, segmt_factor=segmt_factor, remove_small=remove_small)
+                process_fluo_images(img_dir, save_dir, sb_microns=sb_microns, cmax=cmax)
         combine_before_after(root_dir)
         plot_before_after(root_dir, group_labels, group_order=group_order, figsize=(len(group_labels)*8, 8))
