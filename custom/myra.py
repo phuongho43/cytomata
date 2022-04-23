@@ -120,14 +120,9 @@ def preprocess_img(imgf):
     sig = estimate_sigma(img)
     den = denoise_nl_means(img, h=sig, sigma=sig, patch_size=5, patch_distance=7)
     bkg = den.copy()
-    thr = threshold_local(bkg, block_size=5, param=24)
-    broi = bkg * (bkg < thr)
-    if (np.percentile(bkg, 99) - np.percentile(bkg, 1))/np.median(bkg) < 1:
-        broi = broi[(broi > np.percentile(broi, 99))]
-    else:
-        broi = broi[(broi > np.percentile(broi, 50))]
-    tval = threshold_li(broi)
-    bkg[bkg >= tval] = tval
+    thr = threshold_li(bkg)
+    chop = 100 * np.mean(bkg[bkg < thr])/np.mean(bkg[bkg > thr])
+    bkg[bkg >= np.percentile(bkg, chop)] = np.percentile(bkg, chop)
     bkg = gaussian(bkg, 64) + sig
     bkg[bkg < 0] = 0
     img = (img - bkg) / bkg

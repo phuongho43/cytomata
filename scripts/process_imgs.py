@@ -3,6 +3,7 @@ import sys
 import time
 import warnings
 import itertools
+from pathlib import Path
 from joblib import Parallel, delayed
 sys.path.append(os.path.abspath('../'))
 
@@ -78,12 +79,12 @@ def plot_groups(root_dir, group_labels, group_order, figsize=(16, 8)):
         plt.close()
 
 
-def combine_before_after(root_dir):
+def combine_before_after(root_dir, ch):
     df = pd.DataFrame(columns=['group', 'timepoint', 'response'])
     for tpoint in [0, 1]:
         tp_dir = os.path.join(root_dir, str(tpoint))
         for i, data_dir in enumerate(natsorted([x[1] for x in os.walk(tp_dir)][0])):
-            y_csv = os.path.join(tp_dir, data_dir, 'results', 'y.csv')
+            y_csv = os.path.join(tp_dir, data_dir, ch + '-results', 'y.csv')
             y_data = pd.read_csv(y_csv)
             rs = y_data['y'].values
             gr = np.full_like(rs, i+1)
@@ -126,17 +127,16 @@ def plot_before_after(root_dir, group_labels, group_order, figsize=(24, 8), tp_l
 
 if __name__ == '__main__':
     ## Set Parameters ##
-    root_dir = '/home/phuong/data/GEX/20220414/'
-    img_folder = 'GFP'
+    root_dir = '/home/phuong/data/GEX/20220422/'
+    img_folder = 'TxRed'
     group_labels = [
-        'Reporter\n+ CD19-SN\n(Day 0)',
-        'Reporter\n+ CD19-SN\n(Day 1)',
-        'Reporter\n+ CD19-SN\n+ CD19-antigen\n(Day 1)',
+        'CaM + M13',
+        'CaM-FUSN + M13-FUSN',
     ]
-    group_order = [3, 4, 5]
+    group_order = [1, 2]
     sb_microns = 110
     cmax = None
-    before_after = False
+    before_after = True
     
 
     if not before_after:
@@ -153,14 +153,14 @@ if __name__ == '__main__':
 
     else:
     #### Before-After Fold Change ##
-        for t in ['0', '1']:
-            tp_dir = os.path.join(root_dir, t)
-            for group_dir in natsorted(os.listdir(tp_dir)):
-                if group_dir == ".directory":
-                    continue
-                print(group_dir)
-                img_dir = os.path.join(tp_dir, group_dir, img_folder)
-                save_dir = os.path.join(tp_dir, group_dir, img_folder + '-results')
-                process_fluo_images(img_dir, save_dir, sb_microns=sb_microns, cmax=cmax)
-        combine_before_after(root_dir)
+        # for t in ['0', '1']:
+        #     tp_dir = os.path.join(root_dir, t)
+        #     for group_dir in natsorted(os.listdir(tp_dir)):
+        #         if group_dir == ".directory":
+        #             continue
+        #         print(group_dir)
+        #         img_dir = os.path.join(tp_dir, group_dir, img_folder)
+        #         save_dir = os.path.join(tp_dir, group_dir, img_folder + '-results')
+        #         process_fluo_images(img_dir, save_dir, sb_microns=sb_microns, cmax=cmax)
+        combine_before_after(root_dir, img_folder)
         plot_before_after(root_dir, group_labels, group_order=group_order, figsize=(len(group_labels)*8, 8))

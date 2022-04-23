@@ -22,7 +22,7 @@ from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
 from skimage import img_as_float, img_as_ubyte, img_as_uint
 from skimage.io import imread, imsave
 from skimage.exposure import rescale_intensity
-from skimage.filters import (gaussian, median, threshold_li, threshold_local)
+from skimage.filters import (gaussian, median, threshold_li, threshold_local, threshold_otsu)
 from skimage.morphology import remove_small_objects
 from skimage.restoration import denoise_nl_means, estimate_sigma
 from skimage.measure import regionprops
@@ -121,14 +121,9 @@ def preprocess_img(imgf):
     sig = estimate_sigma(img)
     den = denoise_nl_means(img, h=sig, sigma=sig, patch_size=5, patch_distance=7)
     bkg = den.copy()
-    thr = threshold_local(bkg, block_size=5, param=24)
-    broi = bkg * (bkg < thr)
-    if (np.percentile(bkg, 99.9) - np.percentile(bkg, 0.1))/np.percentile(bkg, 0.1) < 0.5:
-        broi = broi[(broi > np.percentile(broi, 99))]
-    else:
-        broi = broi[(broi > np.percentile(broi, 40))]
-    tval = threshold_li(broi)
-    bkg[bkg >= tval] = tval
+    thr = threshold_li(bkg)
+    chop = 100 * np.mean(bkg[bkg < thr])/np.mean(bkg[bkg > thr])
+    bkg[bkg >= np.percentile(bkg, chop)] = np.percentile(bkg, chop)
     bkg = gaussian(bkg, 64) + sig
     bkg[bkg < 0] = 0
     img = (img - bkg) / bkg
@@ -147,7 +142,7 @@ def segment_object(img, segmt_local=False, factor=1, rs=None):
     if segmt_local:
         thv = threshold_local(img, block_size=5, param=24) * factor
     else:
-        thv = threshold_li(img) * factor
+        thv = threshold_li(img, initial_guess=np.percentile(img, 1)) * factor
     thr = img > thv
     if rs is not None:
         thr = remove_small_objects(ndi.label(thr)[0].astype(bool), min_size=rs)
@@ -208,5 +203,8 @@ if __name__ == '__main__':
     root_dir = Path(img_dir).parent.absolute()
     img_folder = Path(img_dir).name
     save_dir = os.path.join(root_dir, img_folder + '-results')
+    # imgf = '/home/phuong/data/katie/20220420/mCherry/mCh-1.TIF'
+    # imgf = '/home/phuong/data/GEX/20220416/1_20220416_12UAS-YB-mScI/TxRed/0_0.tiff'
+    # preprocess_img(imgf)
     process_fluo_images(img_dir, save_dir, sb_microns=sb_microns, cmax=cmax,
-        segmt_factor=segmt_factor, remove_small=remove_small)
+        segmt_factor=segmt_factor, remove_small=remove_small, segmt_local=True)
