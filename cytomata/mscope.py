@@ -108,6 +108,7 @@ class Microscope(object):
 
     def snap_image(self):
         self.core.wait_for_system()
+        self.core.clear_circular_buffer()
         self.core.snap_image()
         timg = self.core.get_tagged_image()
         img = self.convert_tagged_img(timg)
@@ -192,11 +193,11 @@ class Microscope(object):
     def pulse_light(self, cid, width, ch_ind):
         self.set_channel(ch_ind)
         self.core.set_auto_shutter(False)
-        ta = time.time() - self.t0
         self.core.set_shutter_open(True)
+        ta = time.time() - self.t0
         time.sleep(width)
-        self.core.set_shutter_open(False)
         tb = time.time() - self.t0
+        self.core.set_shutter_open(False)
         self.core.set_auto_shutter(True)
         self.uta[cid].append(ta)
         self.utb[cid].append(tb)

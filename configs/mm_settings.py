@@ -18,32 +18,43 @@ SETTINGS = {
     'stage_z_limit': [-240, 240],
     'stage_x_limit': [-9600, 9600],
     'stage_y_limit': [-9600, 9600],
-    'mpos': 'parallel', # None or 'sequential' or 'parallel'
-    'mpos_ch': 'TxRed',
+    'mpos': None, # None or 'sequential' or 'parallel'
+    'mpos_ch': 'mCherry',
     'roi_center': False,
 }
 
 
 # Seconds-Timescale ##
+IMAGING = {
+   't_info': [(0, 61, 5), (61, 62, 1), (65, 301, 5)],  # (start, stop, period)
+   'chs': ['mCherry']
+}
+
+INDUCTION = {
+   't_info': [(60, 61, 1, 1)],  # (start, stop, period, width)
+   'ch_ind': 'BL1'
+}
+
+
+# Seconds-Timescale ## Pulsatile 1s-2s ##
 # IMAGING = {
-#    't_info': [(0, 601, 5)],  # (start, stop, period)
-#    'chs': ['mCherry']
-# }
-
-# INDUCTION = {
-#    't_info': [(60, 65, 5, 5)],  # (start, stop, period, width)
-#    'ch_ind': 'BL1'
-# }
-
-
-# Seconds-Timescale ## Pulsatile ##
-# IMAGING = {
-#     't_info': [(0, 181, 5)],  # (start, stop, period)
+#     't_info': [(0, 301, 5)],  # (start, stop, period)
 #     'chs': ['mCherry']
 # }
 
 # INDUCTION = {
-#     't_info': [(60, 91, 3, 1)],  # (start, stop, period, width)
+#     't_info': [(60, 91, 2, 1)],  # (start, stop, period, width)
+#     'ch_ind': 'BL1'
+# }
+
+# Seconds-Timescale ## Pulsatile 1s-10s ##
+# IMAGING = {
+#     't_info': [(0, 301, 5)],  # (start, stop, period)
+#     'chs': ['mCherry']
+# }
+
+# INDUCTION = {
+#     't_info': [(60, 91, 10, 1)],  # (start, stop, period, width)
 #     'ch_ind': 'BL1'
 # }
 
@@ -60,21 +71,21 @@ SETTINGS = {
 # }
 
 
-# Hours-Timescale ## 
-IMAGING = {
-    't_info': [(0, 86401, 300)],
-    'chs': ['DIC', 'CFP', 'GFP', 'TxRed']
-}
-
-# INDUCTION = {
-#     't_info': [(0, 57600, 10, 1)],
-#     'ch_ind': 'BL1'
+# # Hours-Timescale ## 
+# IMAGING = {
+#     't_info': [(0, 86401, 300)],
+#     'chs': ['DIC', 'CFP', 'GFP', 'TxRed']
 # }
 
-AUTOFOCUS = {
-    't_info': [(0, 86400, 300)],
-    'ch': 'DIC',
-    'bounds': [-10.0, 10.0],
-    'z_step': 5.0,
-    'offset': 0.0
-}
+# # INDUCTION = {
+# #     't_info': [(0, 57600, 10, 1)],
+# #     'ch_ind': 'BL1'
+# # }
+
+# AUTOFOCUS = {
+#     't_info': [(0, 86400, 300)],
+#     'ch': 'DIC',
+#     'bounds': [-10.0, 10.0],
+#     'z_step': 5.0,
+#     'offset': 0.0
+# }
