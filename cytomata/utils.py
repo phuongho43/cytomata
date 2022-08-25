@@ -3,7 +3,7 @@ import imghdr
 from natsort import natsorted
 
 
-custom_palette = ['#648FFF', '#DC267F', '#FE6100', '#FFB000', '#785EF0']
+custom_palette = ['#648FFF', '#785EF0', '#DC267F', '#FE6100', '#FFB000']
 
 
 custom_styles = {

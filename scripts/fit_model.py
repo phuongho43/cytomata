@@ -11,46 +11,23 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 from scipy.interpolate import interp1d
+from scipy.integrate import simps
 from natsort import natsorted
 
-from cytomata.model import sim_itrans, sim_idimer, sim_express, sim_fresca
+from cytomata.model import sim_idimer, sim_idissoc, sim_ifate
 from cytomata.utils import setup_dirs, clear_screen, custom_styles, custom_palette
 
 
-def prep_iLID_data(y_csv, u_csv):
-    ydf = pd.read_csv(y_csv)
-    udf = pd.read_csv(u_csv)
-    td = np.around(ydf['t'].values, 1)
-    yd = ydf['y'].values
-    t = np.around(np.arange(td[0], td[-1], 0.1), 1)
-    ydf = interp1d(td, yd, kind='linear')
-    y = np.array([ydf(ti) for ti in t])
-    uta = np.around(udf['ta'].values, 1)
-    utb = np.around(udf['tb'].values, 1)
-    u = np.zeros_like(t)
-    for ta, tb in zip(uta, utb):
-        ia = list(t).index(ta)
-        ib = list(t).index(tb)
-        u[ia:ib] = 1
-    return t, y, u
-
-
-def fit_idimer(t1, y1, u1, t2, y2, u2, save_dir):
-    y01 = [1, 0, 1, 0]
-    uf1 = interp1d(t1, u1, kind='nearest')
-    y02 = [1, 0, 1, 0]
-    uf2 = interp1d(t2, u2, kind='nearest')
+def fit_idimer(td, yd, ud, save_dir):
+    y0 = [10, 0, 10, 1, 0]
+    uf = interp1d(td, ud, kind='nearest')
     min_res = 1e15
     best_params = None
     iter_t = time.time()
     def residual(params):
-        params1 = {'kl': params['kl'].value, 'kd': params['kd1'].value, 'kf': params['kf'].value, 'kr': params['kr'].value}
-        tm1, ym1 = sim_idimer(t1, y01, uf1, params1)
-        params2 = {'kl': params['kl'].value, 'kd': params['kd2'].value, 'kf': params['kf'].value, 'kr': params['kr'].value}
-        tm2, ym2 = sim_idimer(t2, y02, uf2, params2)
-        res1 = np.sum((ym1[-1] - y1)**2)
-        res2 = np.sum((ym2[-1] - y2)**2)
-        return  res1 + res2
+        tm, ym = sim_idimer(td, y0, uf, params)
+        res = np.sum(((ym[-1] + ym[-2]) - yd)**2)
+        return  res
     def opt_iter(params, iter, res):
         nonlocal min_res, best_params, iter_t
         clear_screen()
@@ -66,14 +43,14 @@ def fit_idimer(t1, y1, u1, t2, y2, u2, save_dir):
         print('Res:', str(min_res))
         print(best_params)
     params = lm.Parameters()
-    params.add('kl', value=0.1, min=0.0, max=100.0)
-    params.add('kd1', value=0.1, min=0.0, max=100.0)
-    params.add('kd2', value=0.1, min=0.0, max=100.0)
-    params.add('kf', value=0.1, min=0.0, max=100.0)
-    params.add('kr', value=0.1, min=0.0, max=100.0)
+    params.add('kl', value=0.0, min=0.0, max=10.0)
+    params.add('kd', value=0.0, min=0.0, max=10.0)
+    params.add('kif', value=0.0, min=0.0, max=10.0)
+    params.add('kaf', value=0.0, min=0.0, max=10.0)
+    params.add('kr', value=0.0, min=0.0, max=10.0)
     ta = time.time()
     results = lm.minimize(
-        residual, params, method='powell',
+        residual, params, method='differential_evolution',
         iter_cb=opt_iter, nan_policy='propagate', tol=1e-6
     )
     print('Elapsed Time: ', str(time.time() - ta))
@@ -81,24 +58,72 @@ def fit_idimer(t1, y1, u1, t2, y2, u2, save_dir):
     print(opt_params)
     with open(os.path.join(save_dir, 'opt_params.json'), 'w', encoding='utf-8') as fo:
         json.dump(opt_params, fo, ensure_ascii=False, indent=4)
-    params1 = {'kl': opt_params['kl'], 'kd': opt_params['kd1'], 'kf': opt_params['kf'], 'kr': opt_params['kr']}
-    tm1, ym1 = sim_idimer(t1, y01, uf1, params1)
-    params2 = {'kl': opt_params['kl'], 'kd': opt_params['kd2'], 'kf': opt_params['kf'], 'kr': opt_params['kr']}
-    tm2, ym2 = sim_idimer(t2, y02, uf2, params2)
+    tm, ym = sim_idimer(td, y0, uf, opt_params)
     with plt.style.context(('seaborn-whitegrid', custom_styles)), sns.color_palette(custom_palette):
-        fig, (ax0, ax1, ax2) = plt.subplots(3, 1, sharex=True, figsize=(24, 16), gridspec_kw={'height_ratios': [1, 8, 8]})
-        ax0.plot(t1, u1)
+        fig, (ax0, ax1) = plt.subplots(2, 1, sharex=True, figsize=(24, 16), gridspec_kw={'height_ratios': [1, 8]})
+        ax0.plot(td, ud)
         ax0.set_yticks([0, 1])
         ax0.set_ylabel('BL')
-        ax1.plot(t1, y1, color='#DC267F', label='Data (iLIDfast)', linestyle='dashed', linewidth=3)
-        ax1.plot(tm1, ym1[-1], color='#648FFF', label='Model (iLIDfast)', alpha=0.6)
+        ax1.plot(td, yd, color='#785EF0', label='Data', linestyle='dashed', linewidth=3)
+        ax1.plot(tm, ym[-1]+ym[-2], color='#648FFF', label='Model', alpha=0.6)
+        ax1.set_ylabel('AU')
+        ax1.set_xlabel('Time (s)')
+        ax1.legend(loc='best')
+        fig.tight_layout()
+        fig.canvas.draw()
+        fig.savefig(os.path.join(save_dir, 'fit.png'),
+            dpi=300, bbox_inches='tight', transparent=False, pad_inches=0)
+        plt.close(fig)
+    return opt_params
+
+
+def fit_idissoc(td, yd, ud, save_dir):
+    y0 = [np.min(yd), np.min(yd), yd[0]]
+    uf = interp1d(td, ud, kind='nearest')
+    min_res = 1e15
+    best_params = None
+    iter_t = time.time()
+    def residual(params):
+        tm, ym = sim_idissoc(td, y0, uf, params)
+        res = np.sum((ym[-1] - yd)**2)
+        return  res
+    def opt_iter(params, iter, res):
+        nonlocal min_res, best_params, iter_t
+        clear_screen()
+        ti = time.time()
+        print('seconds/iter:', str(ti - iter_t))
+        iter_t = ti
+        print('Iter: {} | Res: {}'.format(iter, res))
+        print(params.valuesdict())
+        if res < min_res:
+            min_res = res
+            best_params = params.valuesdict()
+        print('Best so far:')
+        print('Res:', str(min_res))
+        print(best_params)
+    params = lm.Parameters()
+    params.add('kl', value=0.0, min=0.0, max=10.0)
+    params.add('kd', value=0.0, min=0.0, max=10.0)
+    ta = time.time()
+    results = lm.minimize(
+        residual, params, method='nelder',
+        iter_cb=opt_iter, nan_policy='propagate', tol=1e-6
+    )
+    print('Elapsed Time: ', str(time.time() - ta))
+    opt_params = results.params.valuesdict()
+    print(opt_params)
+    with open(os.path.join(save_dir, 'opt_params.json'), 'w', encoding='utf-8') as fo:
+        json.dump(opt_params, fo, ensure_ascii=False, indent=4)
+    tm, ym = sim_idissoc(td, y0, uf, opt_params)
+    with plt.style.context(('seaborn-whitegrid', custom_styles)), sns.color_palette(custom_palette):
+        fig, (ax0, ax1) = plt.subplots(2, 1, sharex=True, figsize=(24, 16), gridspec_kw={'height_ratios': [1, 8]})
+        ax0.plot(td, ud)
+        ax0.set_yticks([0, 1])
+        ax0.set_ylabel('BL')
+        ax1.plot(td, yd, color='#785EF0', label='Data', linestyle='dashed', linewidth=3)
+        ax1.plot(tm, ym[-1], color='#648FFF', label='Model', alpha=0.6)
         ax1.set_ylabel('AU')
         ax1.legend(loc='best')
-        ax2.plot(t2, y2, color='#DC267F', label='Data (iLIDslow)', linestyle='dashed', linewidth=3)
-        ax2.plot(tm2, ym2[-1], color='#648FFF', label='Model (iLIDslow', alpha=0.6)
-        ax2.set_xlabel('Time (s)')
-        ax2.set_ylabel('AU')
-        ax2.legend(loc='best')
         fig.tight_layout()
         fig.canvas.draw()
         fig.savefig(os.path.join(save_dir, 'fit.png'),
@@ -108,65 +133,86 @@ def fit_idimer(t1, y1, u1, t2, y2, u2, save_dir):
 
 
 if __name__ == '__main__':
-    # root_dir1 = '/home/phuong/data/ILID/ddFP/RA-27V/20200921-B3-sspBu_RA-27V_spike/results/'
-    # root_dir2 = '/home/phuong/data/ILID/ddFP/RA-16I/B3-sspBu_RA-16I_BL1-1s/mCherry-results/'
-    # save_dir = '/home/phuong/data/ILID/ddFP/'
-    # u_csv1 = os.path.join(root_dir1, 'u.csv')
-    # u_csv2 = os.path.join(root_dir2, 'u.csv')
-    # y_csv1 = os.path.join(root_dir1, 'y.csv')
-    # y_csv2 = os.path.join(root_dir2, 'y.csv')
-    # y_data1 = pd.read_csv(y_csv1)
-    # y_data2 = pd.read_csv(y_csv2)
-    # t1 = y_data1['t_ave'].values
-    # t2 = y_data2['t_ave'].values
-    # y1 = y_data1['y_ave'].values
-    # y2 = y_data2['y_ave'].values
-    # y1 = (y1 - y1[0])
-    # y2 = (y2 - y2[0])
-    # yf1 = interp1d(t1, y1, kind='linear')
-    # yf2 = interp1d(t2, y2, kind='linear')
-    # t1 = np.around(np.arange(t1[0], t1[-1], 0.1), 1)
-    # t2 = np.around(np.arange(t2[0], t2[-1], 0.1), 1)
-    # y1 = np.array([yf1(ti) for ti in t1])
-    # y2 = np.array([yf2(ti) for ti in t2])
-    # u_data1 = pd.read_csv(u_csv1)
-    # u_data2 = pd.read_csv(u_csv2)
-    # tu1 = u_data1['tu_ave'].values
-    # tu2 = u_data2['tu_ave'].values
-    # u1 = u_data1['u_ave'].values
-    # u2 = u_data2['u_ave'].values
-    # uf1 = interp1d(tu1, u1, kind='nearest', bounds_error=False, fill_value=0)
-    # uf2 = interp1d(tu2, u2, kind='nearest', bounds_error=False, fill_value=0)
-    # u1 = np.array([uf1(ti) for ti in t1])
-    # u2 = np.array([uf2(ti) for ti in t2])
-    # fit_idimer(t1, y1, u1, t2, y2, u2, save_dir)
+    # ## iDimer (iLID) ###
+    # root_dir = '/home/phuong/data/1-ifate/2-modeling/iLID27V/'
+    # y_csv = os.path.join(root_dir, 'y.csv')
+    # y_data = pd.read_csv(y_csv)
+    # t = y_data['t'].values
+    # y = y_data['y'].values
+    # u = y_data['u'].values
+    # fit_idimer(t, y, u, root_dir)
 
 
-    save_dir = '/home/phuong/data/ILID/ddFP/'
+    # ### iDissoc (LOV) ###
+    # root_dir = '/home/phuong/data/1-ifate/2-modeling/LOV27V/'
+    # y_csv = os.path.join(root_dir, 'y.csv')
+    # y_data = pd.read_csv(y_csv)
+    # t = y_data['t'].values
+    # y = y_data['y'].values
+    # u = y_data['u'].values
+    # fit_idissoc(t, y, u, root_dir)
+
+
+    save_dir = '/home/phuong/data/1-ifate/2-modeling/'
     t = np.arange(0.0, 300.0)
-    u = np.zeros_like(t)
-    u[60:120:2] = 1
-    u[120:240:30] = 1
-    uf = interp1d(t, u, kind='nearest')
-    u1 = np.array([uf(ti) for ti in t])
-    y0 = [10, 1, 0, 0, 1, 0, 0]
-    paramsf = '/home/phuong/data/ILID/ddFP/opt_params.json'
-    with open(paramsf) as f:
-          params = json.load(f)
-    tm, ym = sim_fresca(t, y0, uf, params)
+    y0 = [1, 1, 1, 1, 1, 1, 1, 1]
+    params = {
+        'kl1': 0.3540261525923416, 'kd1': 0.34266130365617986,
+        'kl2': 0.6613735116279074, 'kd2': 0.15594925769986223,
+        'kl3': 0.2697506295580904, 'kd3': 0.00564155126989596
+    }
+    periods = list(range(120, 0, -1))
+    AB_AUCs = []
+    BCD_AUCs = []
+    for period in periods:
+        u = np.zeros_like(t)
+        u[0:300:period] = 1
+        uf = interp1d(t, u, kind='nearest')
+        u1 = np.array([uf(ti) for ti in t])
+        tm, ym = sim_ifate(t, y0, uf, params)
+        AB_AUCs.append(simps(ym[4], tm))
+        BCD_AUCs.append(simps(ym[-1], tm))
     with plt.style.context(('seaborn-whitegrid', custom_styles)), sns.color_palette(custom_palette):
-        fig, (ax0, ax1) = plt.subplots(2, 1, sharex=True, figsize=(24, 16), gridspec_kw={'height_ratios': [1, 8]})
-        ax0.plot(t, u1, linewidth=2)
-        ax0.set_yticks([0, 1])
-        ax0.set_ylabel('BL')
-        ax1.plot(tm, ym[-2], color='#4CAF50', label='iLIDfast-sspB')
-        ax1.plot(tm, ym[-1], color='#F44336', label='iLIDslow-sspB')
-        ax1.set_ylabel('AU')
-        ax1.set_xlabel('Time (s)')
-        ax1.set_ylim([0, 1])
-        ax1.legend(loc='upper right')
+        fig, ax = plt.subplots(figsize=(24, 16))
+        ax.plot(periods, BCD_AUCs, color='#785EF0', label='sparse channel')
+        ax.plot(periods, AB_AUCs, color='#DC267F', label='dense channel')
+        ax.set_ylabel('AUC')
+        ax.set_xlabel('BL Period (s)')
+        # ax1.set_ylim([0, 1.1])
+        ax.legend(loc='upper right')
         fig.tight_layout()
         fig.canvas.draw()
-        fig.savefig(os.path.join(save_dir, 'sim_10fast-1sspB-1slow_BL-1s-2s-t60-t120_BL-1s-30s-t120-t240.png'),
+        fig.savefig(os.path.join(save_dir, 'period-AUCs.png'),
             dpi=300, bbox_inches='tight', transparent=False, pad_inches=0)
         plt.close(fig)
+
+
+    # save_dir = '/home/phuong/data/1-ifate/2-modeling/'
+    # t = np.arange(0.0, 300.0)
+    # y0 = [1, 1, 1, 1, 1, 1, 1, 1]
+    # params = {
+    #     'kl1': 0.3540261525923416, 'kd1': 0.34266130365617986,
+    #     'kl2': 0.6613735116279074, 'kd2': 0.15594925769986223,
+    #     'kl3': 0.2697506295580904, 'kd3': 0.00564155126989596
+    # }
+    # u = np.zeros_like(t)
+    # u[0:300:120] = 1
+    # uf = interp1d(t, u, kind='nearest')
+    # u1 = np.array([uf(ti) for ti in t])
+    # tm, ym = sim_ifate(t, y0, uf, params)
+    # with plt.style.context(('seaborn-whitegrid', custom_styles)), sns.color_palette(custom_palette):
+    #     fig, (ax0, ax1) = plt.subplots(2, 1, sharex=True, figsize=(24, 16), gridspec_kw={'height_ratios': [1, 8]})
+    #     ax0.plot(t, u1, linewidth=2)
+    #     ax0.set_yticks([0, 1])
+    #     ax0.set_ylabel('BL')
+    #     ax1.plot(tm, ym[-1], color='#785EF0', label='sparse channel')
+    #     ax1.plot(tm, ym[4], color='#DC267F', label='dense channel')
+    #     ax1.set_ylabel('AU')
+    #     ax1.set_xlabel('Time (s)')
+    #     # ax1.set_ylim([0, 1.1])
+    #     ax1.legend(loc='upper right')
+    #     fig.tight_layout()
+    #     fig.canvas.draw()
+    #     fig.savefig(os.path.join(save_dir, 'sim_ifate_1s-120s.png'),
+    #         dpi=300, bbox_inches='tight', transparent=False, pad_inches=0)
+    #     plt.close(fig)
