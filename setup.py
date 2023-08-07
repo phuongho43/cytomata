@@ -13,7 +13,6 @@ setuptools.setup(
     description=cytomata.__description__,
     long_description=long_description,
     classifiers=[
-        "Development Status :: 4 - Beta",
         "Environment :: Console",
         "Intended Audience :: Science/Research",
         "License :: OSI Approved :: MIT License",
@@ -34,6 +33,6 @@ setuptools.setup(
     packages=setuptools.find_packages(exclude=['tests']),
     install_requires=[
         'numpy', 'scipy', 'pandas', 'matplotlib', 'seaborn', 'scikit-image', 'joblib',
-        'opencv-python', 'natsort', 'tqdm', 'lmfit', 'pycromanager', 'filterpy'
+        'opencv-python', 'natsort', 'lmfit', 'numdifftools', 'pycromanager'
     ]
 )

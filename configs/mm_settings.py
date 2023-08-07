@@ -18,7 +18,7 @@ SETTINGS = {
     'stage_z_limit': [-240, 240],
     'stage_x_limit': [-9600, 9600],
     'stage_y_limit': [-9600, 9600],
-    'mpos': None, # None or 'sequential' or 'parallel'
+    'mpos': None,  # None or 'sequential' or 'parallel'
     'mpos_ch': 'mCherry',
     'roi_center': False,
 }
@@ -71,7 +71,7 @@ INDUCTION = {
 # }
 
 
-# # Hours-Timescale ## 
+# # Hours-Timescale ##
 # IMAGING = {
 #     't_info': [(0, 86401, 300)],
 #     'chs': ['DIC', 'CFP', 'GFP', 'TxRed']

@@ -13,9 +13,7 @@ from cytomata.utils import setup_dirs, clear_screen
 
 
 class Microscope(object):
-    """
-    Microscope task automation and data recording.
-    """
+    """Microscope task automation and data recording."""
     def __init__(self, settings, config_file):
         self.bridge = Bridge()
         self.core = self.bridge.get_core()
@@ -58,8 +56,7 @@ class Microscope(object):
 
     def set_position(self, axis, value):
         if axis.lower() == 'xy':
-            if (value[0] > self.xlim[0] and value[0] < self.xlim[1] and
-            value[1] > self.ylim[0] and value[1] < self.ylim[1]):
+            if (value[0] > self.xlim[0] and value[0] < self.xlim[1] and value[1] > self.ylim[0] and value[1] < self.ylim[1]):
                 self.core.set_xy_position(self.xy_device, round(value[0]), round(value[1]))
         elif axis.lower() == 'z':
             if value > self.zlim[0] and value < self.zlim[1]:
@@ -86,8 +83,8 @@ class Microscope(object):
             if self.core.get_remaining_image_count() > 0:
                 timg = self.core.get_last_tagged_image()
                 img = self.convert_tagged_img(timg)
-                img = cv2.normalize(img, dst=None,
-                    alpha=0, beta=2**n_bits - 1, norm_type=cv2.NORM_MINMAX)
+                img = cv2.normalize(img, dst=None, alpha=0,
+                    beta=2**n_bits - 1, norm_type=cv2.NORM_MINMAX)
                 cv2.imshow('Coordinate Picker', img)
             k = cv2.waitKey(20)
             if k == 27:  # ESC - Exit
@@ -116,7 +113,7 @@ class Microscope(object):
 
     def snap_zstack(self, chs, zdepth, step):
         z0 = self.get_position('z')
-        zs = np.arange(zi - zdepth/2, zi + zdepth/2, step)
+        zs = np.arange(z0 - zdepth/2, z0 + zdepth/2, step)
         tstamp = time.strftime('%Y%m%d-%H%M%S')
         img_dir = os.path.join(self.save_dir, tstamp + '_zstack')
         imgs = []
@@ -137,8 +134,6 @@ class Microscope(object):
     def snap_xyfield(self, chs, n=3, step=132):
         x0, y0 = self.get_position('xy')
         grid = np.arange(-(n//2)*step, (n//2)*step + step, step)
-        # tstamp = time.strftime('%Y%m%d-%H%M%S')
-        # img_dir = os.path.join(self.save_dir, tstamp + '_xyfield')
         imgs = []
         for i, yi in enumerate(grid):
             for j, xi in enumerate(grid):

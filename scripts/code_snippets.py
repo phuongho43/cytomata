@@ -1,3 +1,109 @@
+# def plot_figure_1():
+#     root_dir = '/home/phuong/data/1-fakr/1-ddFP/0-expression/0-10x/0-ddFP/'
+#     y_df = pd.read_csv(os.path.join(root_dir, 'results', 'y.csv'))
+#     y_df['response'] = np.log2(y_df['response'])
+#     RA = y_df.loc[(y_df['group']==0), 'response']
+#     B3_RA = y_df.loc[(y_df['group']==2), 'response']
+#     print(sp.stats.ttest_ind(RA, B3_RA))
+#     class_labels = []
+#     group_labels = ['RA', 'B3', 'B3 + RA']
+#     ylabel = 'Relative Fluorescence'
+#     palette = ['#DC267F', '#648FFF', '#785EF0']
+#     save_path = os.path.join(root_dir, 'results', 'y.png')
+#     ylabel = r'$\mathdefault{Log_2\ Ratio}$'
+#     plot_class_group(y_df, save_path, group_labels, class_labels=[],
+#         x_var='group', y_var='response', h_var=None, ylabel=ylabel, xlabel='',
+#         ymin=None, ymax=None, palette=palette, figsize=(24, 16))
+
+
+def segment_object(img, segmt_local=False, factor=1, rs=None):
+    """Segment out bright objects from fluorescence image."""
+    if not np.any(img):
+        thr = img.astype(bool)
+        regs, n = None, 0
+        return thr, regs, n
+    if segmt_local:
+        thv = threshold_local(img, block_size=3, param=3) * factor
+    else:
+        thv = threshold_li(img) * factor
+    thr = img > thv
+    thr = ndi.median_filter(thr, 2)
+    thr = erosion(thr, disk(1))
+    thr = ndi.binary_fill_holes(thr)
+    if rs is not None:
+        thr = remove_small_objects(ndi.label(thr)[0].astype(bool), min_size=rs)
+    regs, n = ndi.label(thr)
+    return thr, regs, n
+
+def plot_uy(y_df, u_df, save_dir, fname='y.png', dpi=300, lgd_loc='best', t_unit='s', ylabel=r'$\mathbf{\Delta F/F_{0}}$', ulabel='BL', group_labels=None, ymin=None, ymax=None, order=None, palette=custom_palette):
+    setup_dirs(save_dir)
+    with plt.style.context(('seaborn-whitegrid', custom_styles)), sns.color_palette(palette):
+        if u_df is not None:
+            fig, (ax0, ax) = plt.subplots(
+                2, 1, sharex=True, figsize=(16, 10),
+                gridspec_kw={'height_ratios': [1, 8]}
+            )
+            sns.lineplot(data=u_df, x="t", y="u", ax=ax0, errorbar=None, color='#648FFF')
+            ax0.set_yticks([0, 1])
+            ax0.set_ylabel(ulabel)
+        else:
+            fig, ax = plt.subplots(figsize=(16, 8))
+        if 'h' in y_df.columns:
+            sns.lineplot(data=y_df, x="t", y="y", hue='h', style='h', hue_order=order, style_order=order, ax=ax, errorbar=("ci", 95), palette=palette)
+            handles, _ = ax.get_legend_handles_labels()
+            ax.legend(handles, group_labels, loc=lgd_loc, markerscale=4, prop={"size": 24}, frameon=True, shadow=False)
+        else:
+            sns.lineplot(data=y_df, x="t", y="y", ax=ax, estimator='mean', errorbar=("ci", 95), color='#785EF0')
+        # ax.text(0.96, 1.01, 'n={}'.format(y_df['n'].nunique()), ha='left',
+        #     va='center', fontsize=24, transform=ax.transAxes)
+        ax.set_xlabel('Time ({})'.format(t_unit))
+        ax.set_ylabel(ylabel, fontsize=42)
+        ax.locator_params(axis='x', nbins=10)
+        ax.locator_params(axis='y', nbins=8)
+        ymin_i, ymax_i = ax.get_ylim()
+        if ymax is None:
+            ymax = ymax_i
+        if ymin is None:
+            ymin = ymin_i
+        ax.set_ylim(ymin, ymax)
+        # ax.yaxis.set_major_formatter(FormatStrFormatter('%.2f'))
+        fig.tight_layout()
+        fig.canvas.draw()
+        fig.savefig(os.path.join(save_dir, fname), dpi=dpi, bbox_inches='tight', transparent=False)
+        plt.cla()
+        plt.clf()
+        plt.close('all')
+        plt.close('fig')
+
+def plot_groups(root_dir, group_labels, group_order, figsize=(16, 16)):
+    df = pd.read_csv(os.path.join(root_dir, 'y.csv'))
+    df = df[df.group.isin(group_order)]
+    df['response'] = np.log10(df['response'])
+    with plt.style.context(('seaborn-whitegrid', custom_styles)), sns.color_palette(custom_palette):
+        mpl.colormaps.register(cmap=ListedColormap(custom_palette), name='custom')
+        fig, ax = plt.subplots(figsize=figsize)
+        sns.violinplot(x="group", y="response", data=df, order=group_order, hue_order=group_order, ax=ax,
+                       linewidth=0, scale='count', inner=None, scale_hue=False, cut=0, zorder=0)
+        # sns.stripplot(x="group", y="response", data=df, order=group_order, ax=ax,
+        #                 jitter=0.1, size=2, linewidth=0, dodge=True, alpha=0.4, zorder=0)
+        sns.pointplot(x="group", y="response", data=df, order=group_order, ax=ax,
+                        estimator=np.mean, ci='sd', join=False, dodge=0.4, markers='.',
+                        errwidth=2, capsize=0.05, scale=0.3, color='#212121', zorder=1)
+        ax.set_xlabel('')
+        ax.set_xticklabels(group_labels)
+        ax.set_ylabel('Fluorescence (AU)')
+        ax.yaxis.set_major_formatter(mticker.StrMethodFormatter("$10^{{{x:.0f}}}$"))
+        ymin, ymax = ax.get_ylim()
+        tick_range = np.arange(np.floor(ymin), 1)
+        ax.yaxis.set_ticks(tick_range)
+        ax.yaxis.set_ticks([np.log10(x) for p in tick_range for x in np.linspace(10 ** p, 10 ** (p + 1), 10)], minor=True)
+        ax.tick_params(which='minor', length=8, width=2)
+        ax.tick_params(which='major', length=12, width=4)
+        # ax.set_yscale('log')
+        fig_name = 'y_' + '-'.join([str(int(g)) for g in df.group.unique()]) + '.png'
+        plt.savefig(os.path.join(root_dir, fig_name), dpi=200, transparent=False, bbox_inches='tight')
+        plt.close()
+
 def combine_uy(root_dir, fold_change=True, plot_u=True):
     with plt.style.context(('seaborn-whitegrid', custom_styles)):
         if plot_u:
