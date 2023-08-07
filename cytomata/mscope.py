@@ -27,6 +27,8 @@ class Microscope(object):
         self.z_device = self.settings['z_device']
         for dev in self.settings['img_sync']:
             self.core.assign_image_synchro(dev)
+        self.core.clear_roi()
+        self.core.clear_circular_buffer()
         self.uta = defaultdict(list)
         self.utb = defaultdict(list)
         self.x0, self.y0 = self.get_position('xy')
