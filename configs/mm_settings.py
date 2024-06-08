@@ -18,13 +18,10 @@ SETTINGS = {
     'stage_z_limit': [-240, 240],
     'stage_x_limit': [-9600, 9600],
     'stage_y_limit': [-9600, 9600],
-<<<<<<< HEAD
     'mpos': None,  # None or 'sequential' or 'parallel'
     'mpos_ch': 'mCherry',
-=======
     'mpos': None, # None or 'sequential' or 'parallel'
     'mpos_ch': 'GFP',
->>>>>>> b6f67af41b0cac9a9df34b4cff3f406a778cc6a6
     'roi_center': False,
 }
 
@@ -46,7 +43,7 @@ IMAGING = {
 }
 
 INDUCTION = {
-   't_info': [(60, 120, 10, 1), (120, 150, 5, 4.5), (150, 210, 10, 1)],  # (start, stop, period, width)
+   't_info': [(60, 120, 4, 1), (120, 180, 5, 4.5), (180, 240, 4, 1), (240, 301, 5, 4.5)],  # (start, stop, period, width)
    'ch_ind': 'BL1'
 }
 
